@@ -50,7 +50,7 @@ fewer/more categories - fewer categories means less training time.
 ## 4. Download the dataset & train
 
 The MVTec AD dataset downloads **automatically** the first time you run a
-training script (Anomalib's `MVTec` datamodule handles this - no manual
+training script (Anomalib's `MVTecAD` datamodule handles this - no manual
 download step). Expect the first run per category to take a while
 (dataset download + several training epochs).
 
