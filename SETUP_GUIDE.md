@@ -169,6 +169,9 @@ Confirm Ollama is running (`ollama list` should not error) and that
 `OLLAMA_HOST` in `.env` matches wherever it's listening (default
 `http://localhost:11434`).
 
+**`ValueError: train_batch_size for EfficientAd should be 1.`:**
+Confirmed by a real run on 2026-09-09. EfficientAd's architecture computes its normalization statistics per-sample during training, so anomalib hard-requires `train_batch_size=1` for this backend specifically (PatchCore has no such restriction and uses the default 32). `training/common.py` already sets this automatically based on `model_backend` - if you see this error, you're on an older copy of the file; pull the latest.
+
 **`ModelNotTrainedError` from the API:**
 Expected before step 4 has been run for that category/backend - the
 checkpoint just doesn't exist yet.

@@ -61,7 +61,15 @@ def train_and_evaluate(model_backend: str, model_cls_name: str, categories: list
 
     for category in categories:
         print(f"\n=== Training {model_backend} on category='{category}' ===")
-        datamodule = MVTecAD(root=str(settings.mvtec_root_path), category=category)
+        # EfficientAd hard-requires train_batch_size == 1 (its normalization
+        # statistics are computed per-sample); PatchCore is fine with the
+        # anomalib default of 32.
+        train_batch_size = 1 if model_backend == "efficient_ad" else 32
+        datamodule = MVTecAD(
+            root=str(settings.mvtec_root_path),
+            category=category,
+            train_batch_size=train_batch_size,
+        )
         model = model_cls()
         engine = Engine()
 
