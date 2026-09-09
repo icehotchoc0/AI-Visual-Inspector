@@ -6,6 +6,10 @@ Usage (from project root, GPU machine, deps installed - see SETUP_GUIDE.md):
     python training/train_patchcore.py --categories bottle,screw
 """
 import argparse
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # so `training.common` resolves when run as `python training/train_patchcore.py`
 
 from training.common import train_and_evaluate
 
