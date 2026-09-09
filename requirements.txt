@@ -1,0 +1,32 @@
+# Core ML / anomaly detection
+torch>=2.1.0
+torchvision>=0.16.0
+anomalib[core]>=1.1.0
+
+# Backend / API
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+python-multipart>=0.0.9
+python-dotenv>=1.0.0
+
+# VLM (local, via Ollama)
+ollama>=0.1.7
+
+# Imaging / numerics
+pillow>=10.0.0
+numpy>=1.26.0
+opencv-python-headless>=4.9.0
+matplotlib>=3.8.0
+
+# Dashboard
+streamlit>=1.31.0
+requests>=2.31.0
+
+# Data / eval
+pandas>=2.2.0
+scikit-learn>=1.4.0
+
+# Testing
+pytest>=8.0.0

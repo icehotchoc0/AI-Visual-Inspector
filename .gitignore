@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Env
+.env
+
+# Data & model artifacts (large, regenerable - never commit)
+backend/data/mvtec_ad/
+backend/data/checkpoints/
+training/results/
+*.ckpt
+*.pt
+*.onnx
+*.xml
+*.bin
+
+# Logs
+*.log
+lightning_logs/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/

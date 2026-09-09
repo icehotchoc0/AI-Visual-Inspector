@@ -1,0 +1,20 @@
+# Ollama is expected to run on the HOST (matches AI-Portfolio-Agent's
+# "local-only inference" design) - the backend container reaches it via
+# host.docker.internal. Mount trained checkpoints and the dataset from the
+# host so training (which needs a real GPU) stays outside the container.
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_HOST=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ../backend/data:/app/backend/data
+      - ../training/results:/app/training/results
+    env_file:
+      - ../.env
