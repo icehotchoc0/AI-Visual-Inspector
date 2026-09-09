@@ -13,16 +13,12 @@ Ollama) - the same local-only, privacy-preserving pattern as
 
 ## Status
 
-The full pipeline (training scripts, inference API, dashboard) is built
-and unit-tested where that doesn't require a GPU (see
-[`tests/`](./tests)). The anomaly-detection models have **not yet been
-trained** - that needs a CUDA GPU and takes real wall-clock time per
-category, which didn't happen inside the environment this scaffold was
-written in. The demo GIF, the results table below, and the "does it
-actually work end to end" claim will be added after that training run -
-see [`SETUP_GUIDE.md`](./SETUP_GUIDE.md) for exactly how to produce it.
-This status line gets deleted once that's done - it stays honest in the
-meantime, same as AI-Dev-Crew's README does about its own test results.
+PatchCore is trained on all 4 categories (bottle, cable, metal_nut,
+screw) - real results below, produced by an actual run on 2026-09-09
+(~67 minutes total for all 4 categories). EfficientAd has not been
+trained yet - that's next. The demo GIF/video in `docs/demo/` still
+needs to be recorded once the Streamlit dashboard has been run against
+these checkpoints.
 
 ## Demo
 
@@ -79,20 +75,19 @@ FastAPI /inspect response  ──►  Streamlit dashboard
 
 ## Results
 
-*(Populated by `training/evaluate.py` after training - see
-[`SETUP_GUIDE.md`](./SETUP_GUIDE.md). Not filled in yet; showing the
-table shape.)*
+Real numbers from `training/evaluate.py`, produced by an actual training
+run (PyTorch/Anomalib 2.6.1, CPU) on 2026-09-09:
 
 | Category | Backend | Image AUROC | Pixel AUROC |
 |---|---|---|---|
-| bottle | patchcore | - | - |
-| cable | patchcore | - | - |
-| metal_nut | patchcore | - | - |
-| screw | patchcore | - | - |
-| bottle | efficient_ad | - | - |
-| cable | efficient_ad | - | - |
-| metal_nut | efficient_ad | - | - |
-| screw | efficient_ad | - | - |
+| bottle | patchcore | 1.000 | 0.986 |
+| cable | patchcore | 0.986 | 0.985 |
+| metal_nut | patchcore | 0.998 | 0.987 |
+| screw | patchcore | 0.964 | 0.989 |
+| bottle | efficient_ad | pending | pending |
+| cable | efficient_ad | pending | pending |
+| metal_nut | efficient_ad | pending | pending |
+| screw | efficient_ad | pending | pending |
 
 ## Tech stack
 
@@ -136,18 +131,20 @@ installing dependencies, pulling the VLM model, downloading MVTec AD
 
 ## Limitations
 
-- Training has not been run yet in this environment (needs a local GPU) -
-  see "Status" above.
+- EfficientAd has not been trained yet - PatchCore only so far (see
+  "Status" above).
 - The VLM's `likely_cause` and `severity` fields are natural-language
   suggestions grounded in the detected region, not verified diagnoses -
   they're there to make the report readable, not to replace the anomaly
   score as the source of truth.
-- `backend/detector.py` and `training/common.py` target anomalib 2.6.1
-  (confirmed against the actual pip install and current docs - the v2
-  `MVTecAD` rename is already applied). The one remaining unconfirmed
-  spot is the exact metric key names `engine.test()` returns and whether
-  `TorchInferencer` is still present by the time you run this - both are
-  called out with a concrete fallback in `SETUP_GUIDE.md -> Troubleshooting`.
+- `backend/detector.py` and `training/common.py` target anomalib 2.6.1.
+  The `training/common.py` side (MVTecAD, Patchcore, Engine, and the
+  `image_AUROC`/`pixel_AUROC` result keys) is now confirmed correct by
+  an actual successful training run, not just documentation. The
+  inference side (`backend/detector.py`'s `TorchInferencer`) has not been
+  exercised yet - that happens once the FastAPI backend is actually run
+  against these checkpoints; if it errors, `SETUP_GUIDE.md ->
+  Troubleshooting` has the `PredictDataset` fallback.
 
 ## Companion projects
 

@@ -30,3 +30,8 @@ desktop.ini
 # Editors
 .vscode/
 .idea/
+
+# Anomalib's own default output dir (created at repo root when Engine()
+# is used without an explicit default_root_dir) - large, regenerable,
+# and contains a "latest" symlink that isn't readable through this mount.
+/results/
