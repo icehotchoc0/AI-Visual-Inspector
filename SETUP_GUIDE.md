@@ -105,15 +105,33 @@ AI-Dev-Crew's demo gif) and save it to `docs/demo/`. Update the README's
 
 ## Troubleshooting
 
-**`ImportError` on `from anomalib.deploy import TorchInferencer` or
-`from anomalib.models import Patchcore/EfficientAd`:**
-Anomalib has reorganized its public API across 1.x minor versions a few
-times. Run `python -c "import anomalib; print(anomalib.__version__)"`
-and check that version's docs/changelog on
-https://github.com/openvinotoolkit/anomalib for the current import path,
-then fix the import line in `backend/detector.py` (for inference) or
-`training/common.py` (for training) - both are written so the fix is a
-one-line change in one place, not a rewrite.
+**Confirmed already, nothing to do:** this project targets anomalib 2.x.
+`pip install -r requirements.txt` pulled anomalib 2.6.1 the first time
+this was set up, and the code already uses the v2 names
+(`anomalib.data.MVTecAD`, not the old v1 `MVTec`). If your install
+resolves to a different 2.x version, the below still applies; if it
+somehow installs a 1.x version instead, swap `MVTecAD` back to `MVTec`
+in `training/common.py`.
+
+**`ImportError` on `from anomalib.deploy import TorchInferencer`:**
+Current anomalib docs call this class "legacy" (kept for backward
+compatibility, not the primary documented path) in favour of:
+```python
+from anomalib.data import PredictDataset
+dataset = PredictDataset(path="path/to/single/image/folder", image_size=(256, 256))
+predictions = engine.predict(model=model, dataset=dataset, ckpt_path=str(ckpt))
+```
+If `TorchInferencer` has been removed by the time you run this, replace
+the body of `AnomalyDetector._load`/`predict` in `backend/detector.py`
+with the `PredictDataset` + `engine.predict()` approach above - you'll
+need to write the uploaded image to a temp folder first since
+`PredictDataset` reads from disk, not from an in-memory array.
+
+**`ImportError` on `from anomalib.models import Patchcore` or
+`EfficientAd`:** these two class names are confirmed correct for 2.6.1.
+If a newer anomalib release changes them, `python -c "import
+anomalib.models; print(dir(anomalib.models))"` will show the current
+names.
 
 **`engine.test()` result keys don't match `image_AUROC`/`pixel_AUROC`:**
 Print `result` in `training/common.py` before those two lines to see the

@@ -1,7 +1,7 @@
 # Core ML / anomaly detection
 torch>=2.1.0
 torchvision>=0.16.0
-anomalib[core]>=1.1.0
+anomalib>=2.0.0  # [core] extra removed in v2, base install now includes it
 
 # Backend / API
 fastapi>=0.109.0

@@ -6,16 +6,18 @@ Everything downstream (the VLM explainer) describes that decision in
 words - it never overrides it. Same "don't trust the agent's self-report,
 verify independently" principle used in AI-Dev-Crew's test verification.
 
-Wraps Anomalib's TorchInferencer. Anomalib's public inference API has
-shifted slightly across 1.x releases - if `from anomalib.deploy import
-TorchInferencer` fails or its returned object's attribute names differ on
-your installed version, check `SETUP_GUIDE.md` -> "Troubleshooting" and
-adjust the two spots marked ANOMALIB-API below. This file was written
-against the documented anomalib>=1.1 API but not run end-to-end against a
-live install (no GPU in this environment) - the code path from image in
-to (score, heatmap) out has been kept deliberately small and isolated in
-this class specifically so a version mismatch is a one-file fix, not a
-rewrite.
+Wraps Anomalib's TorchInferencer. As of anomalib 2.6.1 (the version
+actually installed here), TorchInferencer still exists at
+`anomalib.deploy` but current docs mark it "legacy" in favour of
+`engine.predict()` with a `PredictDataset` - which reads from a folder of
+files rather than a single in-memory image, so it doesn't fit a live
+FastAPI upload endpoint as cleanly. TorchInferencer was kept deliberately
+for that reason; if it has been removed by the time you run this,
+`SETUP_GUIDE.md -> Troubleshooting` has the `engine.predict()` fallback
+to switch to instead. Not run end-to-end here (no GPU in this
+environment) - the imports/class names were confirmed against the 2.6.1
+docs, but this specific class's exact attribute names on the returned
+result were not.
 """
 from __future__ import annotations
 

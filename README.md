@@ -142,11 +142,12 @@ installing dependencies, pulling the VLM model, downloading MVTec AD
   suggestions grounded in the detected region, not verified diagnoses -
   they're there to make the report readable, not to replace the anomaly
   score as the source of truth.
-- `backend/detector.py` and `training/common.py` are written against the
-  documented anomalib>=1.1 API; exact class/attribute names have moved
-  between anomalib releases before, so a version mismatch is possible and
-  is called out explicitly in code comments and in
-  `SETUP_GUIDE.md -> Troubleshooting`.
+- `backend/detector.py` and `training/common.py` target anomalib 2.6.1
+  (confirmed against the actual pip install and current docs - the v2
+  `MVTecAD` rename is already applied). The one remaining unconfirmed
+  spot is the exact metric key names `engine.test()` returns and whether
+  `TorchInferencer` is still present by the time you run this - both are
+  called out with a concrete fallback in `SETUP_GUIDE.md -> Troubleshooting`.
 
 ## Companion projects
 

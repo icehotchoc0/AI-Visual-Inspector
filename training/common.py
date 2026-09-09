@@ -1,16 +1,18 @@
 """
 Shared training/eval logic for both backbones (PatchCore, EfficientAd).
 
-Written against the anomalib>=1.1 `Engine`-based API:
+Verified against anomalib==2.6.1 (the version actually installed via
+requirements.txt on 2026-09-09) using the current official docs:
 
-    from anomalib.data import MVTec
+    from anomalib.data import MVTecAD          # renamed from `MVTec` in v2
     from anomalib.models import Patchcore, EfficientAd
     from anomalib.engine import Engine
 
-If your installed anomalib version renamed/moved these (the library has
-reorganized this a few times across releases), this is the one file to
-fix - see SETUP_GUIDE.md -> Troubleshooting. Not run end-to-end here
-(no GPU in this environment); syntax-checked only.
+Not run end-to-end here (no GPU in this environment) - the imports and
+class names are confirmed correct for 2.6.1, but the exact keys returned
+by `engine.test()` (assumed below: "image_AUROC", "pixel_AUROC") were not
+independently confirmed and are the most likely thing to need a tweak.
+See SETUP_GUIDE.md -> Troubleshooting.
 """
 from __future__ import annotations
 
@@ -49,7 +51,7 @@ def train_and_evaluate(model_backend: str, model_cls_name: str, categories: list
     """model_backend: 'patchcore' | 'efficient_ad' (used for our own file layout)
     model_cls_name:  the anomalib class name to import, e.g. 'Patchcore' or 'EfficientAd'
     """
-    from anomalib.data import MVTec
+    from anomalib.data import MVTecAD
     from anomalib.engine import Engine
     import anomalib.models as anomalib_models
 
@@ -59,7 +61,7 @@ def train_and_evaluate(model_backend: str, model_cls_name: str, categories: list
 
     for category in categories:
         print(f"\n=== Training {model_backend} on category='{category}' ===")
-        datamodule = MVTec(root=str(settings.mvtec_root_path), category=category)
+        datamodule = MVTecAD(root=str(settings.mvtec_root_path), category=category)
         model = model_cls()
         engine = Engine()
 
