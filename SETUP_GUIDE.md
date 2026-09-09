@@ -14,17 +14,43 @@ from inside this project folder, unless noted otherwise.
 
 ## 1. Create a virtual environment and install dependencies
 
+**Important - do this BEFORE `pip install -r requirements.txt`, not after.**
+A plain `pip install torch` (which is what happens if torch is pulled in
+only as anomalib's dependency, e.g. via `requirements.txt` directly) gets
+you the **CPU-only** build - PyPI's default torch wheel does not bundle
+CUDA. This bit us on the first real run here: training ran on CPU
+(`GPU available: False` in the logs) even with an RTX 3080 present.
+
 ```powershell
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install --upgrade pip
+
+# Install the CUDA build of torch FIRST (check nvidia-smi's "CUDA Version"
+# field if unsure - cu128 works with any reasonably current driver on a
+# 30-series card or newer):
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+
+# Verify BEFORE installing anomalib:
+python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU only')"
+
+# Only once that prints True and your GPU's name, install the rest:
 pip install -r requirements.txt
 ```
 
-If `pip install anomalib[core]` fails on your torch/CUDA combination,
-install torch first for your exact CUDA version from
-https://pytorch.org/get-started/locally/, then re-run
-`pip install anomalib[core]`.
+If `torch.cuda.is_available()` still prints `False` after the cu128
+install, your driver is likely older - try `cu118` instead (most broadly
+compatible): `pip install torch torchvision --index-url
+https://download.pytorch.org/whl/cu118`. Either way, `pip install -r
+requirements.txt` afterward will see torch already satisfied and won't
+downgrade it back to CPU - just don't run `pip install torch` bare again
+in this venv.
+
+If you already ran `pip install -r requirements.txt` first (as happened
+here) and training already completed on CPU, the trained checkpoints are
+still valid - CPU vs GPU only affects training/inference *speed*, not
+correctness. Fix the install for the *remaining* training runs
+(EfficientAd in particular needs GPU speed far more than PatchCore did).
 
 ## 2. Pull the local VLM model
 
