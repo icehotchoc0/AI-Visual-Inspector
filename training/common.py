@@ -65,10 +65,19 @@ def train_and_evaluate(model_backend: str, model_cls_name: str, categories: list
         # statistics are computed per-sample); PatchCore is fine with the
         # anomalib default of 32.
         train_batch_size = 1 if model_backend == "efficient_ad" else 32
+        # On Windows, each DataLoader worker is a brand-new process that has
+        # to re-import the whole torch/anomalib/opencv/pandas stack from
+        # scratch (no fork()), which is memory-hungry. anomalib's default of
+        # 8 workers was exhausting the system paging file mid-training on
+        # Ali's machine (DLL load failed / MemoryError in worker processes).
+        # 2 workers is still parallel but far lighter; drop to 0 if this
+        # still happens.
+        num_workers = 2 if model_backend == "efficient_ad" else 8
         datamodule = MVTecAD(
             root=str(settings.mvtec_root_path),
             category=category,
             train_batch_size=train_batch_size,
+            num_workers=num_workers,
         )
         model = model_cls()
         engine = Engine()

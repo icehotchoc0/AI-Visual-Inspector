@@ -12,6 +12,9 @@ venv/
 backend/data/mvtec_ad/
 backend/data/checkpoints/
 training/results/
+# EfficientAd auto-downloads this (imagenette2.tgz, ~1.5GB) into ./datasets
+# the first time it trains - regenerable, never commit.
+/datasets/
 *.ckpt
 *.pt
 *.onnx
