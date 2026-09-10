@@ -13,12 +13,13 @@ Ollama) - the same local-only, privacy-preserving pattern as
 
 ## Status
 
-PatchCore is trained on all 4 categories (bottle, cable, metal_nut,
-screw) - real results below, produced by an actual run on 2026-09-09
-(~67 minutes total for all 4 categories). EfficientAd has not been
-trained yet - that's next. The demo GIF/video in `docs/demo/` still
-needs to be recorded once the Streamlit dashboard has been run against
-these checkpoints.
+Both backbones are trained on all 4 categories (bottle, cable,
+metal_nut, screw) - real results below. PatchCore ran on CPU on
+2026-09-09 (~67 minutes total). EfficientAd ran on an RTX 3080 on
+2026-09-10, capped at 50 epochs/category (~15-20 min/category, under
+1.5 hours total). The demo GIF/video in `docs/demo/` still needs to be
+recorded once the Streamlit dashboard has been run against these
+checkpoints - that's next.
 
 ## Demo
 
@@ -75,8 +76,9 @@ FastAPI /inspect response  ──►  Streamlit dashboard
 
 ## Results
 
-Real numbers from `training/evaluate.py`, produced by an actual training
-run (PyTorch/Anomalib 2.6.1, CPU) on 2026-09-09:
+Real numbers from `training/evaluate.py`, produced by actual training
+runs (PyTorch/Anomalib 2.6.1): PatchCore on CPU on 2026-09-09,
+EfficientAd on an RTX 3080 (GPU) on 2026-09-10:
 
 | Category | Backend | Image AUROC | Pixel AUROC |
 |---|---|---|---|
@@ -84,10 +86,10 @@ run (PyTorch/Anomalib 2.6.1, CPU) on 2026-09-09:
 | cable | patchcore | 0.986 | 0.985 |
 | metal_nut | patchcore | 0.998 | 0.987 |
 | screw | patchcore | 0.964 | 0.989 |
-| bottle | efficient_ad | pending | pending |
-| cable | efficient_ad | pending | pending |
-| metal_nut | efficient_ad | pending | pending |
-| screw | efficient_ad | pending | pending |
+| bottle | efficient_ad | 1.000 | 0.979 |
+| cable | efficient_ad | 0.917 | 0.973 |
+| metal_nut | efficient_ad | 0.991 | 0.957 |
+| screw | efficient_ad | 0.973 | 0.983 |
 
 ## Tech stack
 
@@ -131,8 +133,10 @@ installing dependencies, pulling the VLM model, downloading MVTec AD
 
 ## Limitations
 
-- EfficientAd has not been trained yet - PatchCore only so far (see
-  "Status" above).
+- EfficientAd's cable result (image AUROC 0.917) is noticeably behind
+  PatchCore's (0.986) - plausible given it was capped at 50 epochs for
+  time and cable is MVTec AD's hardest category for most models; more
+  epochs would likely close some of the gap.
 - The VLM's `likely_cause` and `severity` fields are natural-language
   suggestions grounded in the detected region, not verified diagnoses -
   they're there to make the report readable, not to replace the anomaly
