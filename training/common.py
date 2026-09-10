@@ -80,7 +80,16 @@ def train_and_evaluate(model_backend: str, model_cls_name: str, categories: list
             num_workers=num_workers,
         )
         model = model_cls()
-        engine = Engine()
+        # anomalib doesn't set a default max_epochs for EfficientAd (it's
+        # left at Lightning's own default), which becomes 1000 epochs -
+        # confirmed on Ali's machine: ~29s/epoch would be ~8 hours *per
+        # category*. Community reports (anomalib discussion #2262) get
+        # image_AUROC ~0.95 after just 10 epochs; 50 gives real safety
+        # margin while still finishing all 4 categories in ~2 hours on an
+        # RTX 3080. PatchCore has no training loop in this sense (single
+        # feature-extraction + coreset pass), so it's left untouched.
+        engine_kwargs = {"max_epochs": 50} if model_backend == "efficient_ad" else {}
+        engine = Engine(**engine_kwargs)
 
         engine.fit(model=model, datamodule=datamodule)
         test_results = engine.test(model=model, datamodule=datamodule)
