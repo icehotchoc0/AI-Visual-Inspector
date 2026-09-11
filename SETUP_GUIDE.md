@@ -164,16 +164,53 @@ Print `result` in `training/common.py` before those two lines to see the
 exact keys your installed version returns, and adjust the two `.get(...)`
 calls.
 
-**Ollama connection refused from `vlm_explainer.py`:**
+**Ollama connection refused from `vlm_explainer.py`, or `/health` shows
+`"ollama_reachable": false`:**
 Confirm Ollama is running (`ollama list` should not error) and that
-`OLLAMA_HOST` in `.env` matches wherever it's listening (default
-`http://localhost:11434`).
+`INSPECTOR_OLLAMA_HOST` in `.env` matches wherever it's listening
+(default `http://localhost:11434`). Note this is deliberately
+`INSPECTOR_OLLAMA_HOST`, not `OLLAMA_HOST` - see the dedicated
+troubleshooting entry below for why.
 
 **`ValueError: train_batch_size for EfficientAd should be 1.`:**
 Confirmed by a real run on 2026-09-09. EfficientAd's architecture computes its normalization statistics per-sample during training, so anomalib hard-requires `train_batch_size=1` for this backend specifically (PatchCore has no such restriction and uses the default 32). `training/common.py` already sets this automatically based on `model_backend` - if you see this error, you're on an older copy of the file; pull the latest.
 
 **`DLL load failed while importing cv2: The paging file is too small`, `pyarrow>=13.0.0 is required`, or `MemoryError` in a `DataLoader worker process` (all appearing together, mid-training):**
 Confirmed by a real run on 2026-09-09. This is Windows-specific resource exhaustion, not a bug in the data or the GPU setup: anomalib's default `num_workers=8` spawns 8 separate worker *processes* for data loading, and on Windows each one has to re-import the entire torch/anomalib/opencv/pandas stack from scratch (no `fork()` like on Linux), which is heavy enough to exhaust the system paging file. Training itself (the GPU forward/backward pass) had already succeeded for epoch 0 before this hit - it only shows up when the *next* set of dataloader workers spin up (e.g. for validation). `training/common.py` already sets `num_workers=2` for the `efficient_ad` backend specifically (PatchCore keeps the default 8, which worked fine). If you still hit this, drop `num_workers` to `0` in `training/common.py` (no multiprocessing at all - slower but immune to this).
+
+**`/health` shows `"ollama_reachable": false` with
+`"ollama_host": "0.0.0.0"` even though `ollama list` works fine:**
+Confirmed on Ali's machine on 2026-09-10 - a real, subtle bug, not a
+one-off. `OLLAMA_HOST` is Ollama's own well-known env var for
+configuring what address the Ollama *server* binds to (people commonly
+set it to `0.0.0.0` system-wide to allow LAN access to Ollama). This
+project's `backend/config.py` used to read the *client's* target URL
+from that exact same env var name - so a system-wide `OLLAMA_HOST=0.0.0.0`
+silently overrode `.env`'s `http://localhost:11434` (pydantic-settings
+gives real environment variables priority over the `.env` file), and the
+backend then tried to connect *to* `0.0.0.0` as a client target, which
+isn't valid. `backend/config.py` now reads `INSPECTOR_OLLAMA_HOST`
+instead (see `.env.example`) specifically to avoid ever colliding with
+Ollama's own env var again, regardless of how a given machine has
+Ollama's server configured. If you're on an older `.env`, add
+`INSPECTOR_OLLAMA_HOST=http://localhost:11434` to it (the old
+`OLLAMA_HOST=...` line is now unused by this app and can stay or go -
+it won't be read either way). The `/health` endpoint also now returns
+an `ollama_error` field with the real exception text instead of
+silently swallowing it - check that first if this happens again.
+
+**`run_inspector.bat` / `.ps1` opens a window that says `'streamlit' is
+not recognized` or `'uvicorn' is not recognized`:**
+Confirmed on Ali's machine on 2026-09-10 - a real bug in the launcher
+scripts that shipped here, not a setup mistake. The scripts opened
+*new* terminal windows via `start`/`Start-Process`, and those new
+windows don't inherit this venv's activation (they start with the base
+system PATH). Both scripts now call the venv's own
+`venv\Scripts\uvicorn.exe` / `venv\Scripts\streamlit.exe` directly
+by path instead of relying on activation carrying over. If you're on an
+older copy of these files, pull the latest, or just run the two
+commands manually in two terminals where you've activated the venv
+yourself (as shown in step 6 above).
 
 **`ModelNotTrainedError` from the API:**
 Expected before step 4 has been run for that category/backend - the

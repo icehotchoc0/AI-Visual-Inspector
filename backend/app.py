@@ -47,21 +47,31 @@ METRICS_PATH = Path("training/results/metrics.json")
 @app.get("/health")
 def health() -> dict:
     ollama_reachable = False
+    ollama_error = None
     if settings.vlm_enabled:
         try:
             import ollama
 
             ollama.Client(host=settings.ollama_host).list()
             ollama_reachable = True
-        except Exception:
+        except Exception as exc:
+            # Surfaced (not just swallowed) so this is diagnosable from the
+            # dashboard's own /health debug panel, without needing terminal
+            # access to the backend process - confirmed useful in practice
+            # on 2026-09-10, when this reported unreachable despite the
+            # exact same call working fine from a standalone script using
+            # the same venv (see SETUP_GUIDE.md Troubleshooting).
             ollama_reachable = False
+            ollama_error = f"{type(exc).__name__}: {exc}"
 
     return {
         "status": "ok",
         "ad_backend": settings.ad_backend,
         "categories": settings.categories,
         "vlm_enabled": settings.vlm_enabled,
+        "ollama_host": settings.ollama_host,
         "ollama_reachable": ollama_reachable,
+        "ollama_error": ollama_error,
     }
 
 

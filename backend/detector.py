@@ -6,21 +6,25 @@ Everything downstream (the VLM explainer) describes that decision in
 words - it never overrides it. Same "don't trust the agent's self-report,
 verify independently" principle used in AI-Dev-Crew's test verification.
 
-Wraps Anomalib's TorchInferencer. As of anomalib 2.6.1 (the version
-actually installed here), TorchInferencer still exists at
-`anomalib.deploy` but current docs mark it "legacy" in favour of
-`engine.predict()` with a `PredictDataset` - which reads from a folder of
-files rather than a single in-memory image, so it doesn't fit a live
-FastAPI upload endpoint as cleanly. TorchInferencer was kept deliberately
-for that reason; if it has been removed by the time you run this,
-`SETUP_GUIDE.md -> Troubleshooting` has the `engine.predict()` fallback
-to switch to instead. Not run end-to-end here (no GPU in this
-environment) - the imports/class names were confirmed against the 2.6.1
-docs, but this specific class's exact attribute names on the returned
-result were not.
+Uses Anomalib's Engine.predict() + PredictDataset, NOT TorchInferencer.
+
+Confirmed by a real run on Ali's machine (2026-09-10): TorchInferencer
+requires a checkpoint saved via anomalib's own exporter (a .pt/.pth file
+whose top-level dict has a "model" key) - it can NOT load the raw
+Lightning .ckpt files that training/common.py produces directly from
+`Engine.fit()`/`ModelCheckpoint` (raised
+`ValueError: Unknown PyTorch checkpoint format .ckpt`). Engine.predict()
+loads those same raw .ckpt files natively via Lightning's own checkpoint
+loading, so it works with what training already produces - no separate
+export step needed. This was flagged as the documented fallback in
+SETUP_GUIDE.md before it was confirmed necessary; it's now the only path.
+
+PredictDataset reads images from disk rather than an in-memory array, so
+each call writes the uploaded image to a throwaway temp file first.
 """
 from __future__ import annotations
 
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -50,13 +54,23 @@ def _checkpoint_path(category: str, backend: str) -> Path:
     return settings.checkpoint_dir_path / category / backend / "model.ckpt"
 
 
+# Maps our own "backend" name (used in file paths / API params) to the
+# anomalib model class name - same mapping training/common.py uses.
+_MODEL_CLASS_NAMES = {
+    "patchcore": "Patchcore",
+    "efficient_ad": "EfficientAd",
+}
+
+
 class AnomalyDetector:
     """Loads one trained Anomalib model for one (category, backend) pair."""
 
     def __init__(self, category: str, backend: str | None = None):
         self.category = category
         self.backend = backend or settings.ad_backend
-        self._inferencer = None
+        self._model = None
+        self._engine = None
+        self._ckpt_path: Path | None = None
         self._load()
 
     def _load(self) -> None:
@@ -66,26 +80,58 @@ class AnomalyDetector:
                 f"No trained checkpoint at {ckpt}. Run training/train_{self.backend}.py "
                 f"for category='{self.category}' first (see SETUP_GUIDE.md)."
             )
-        # ANOMALIB-API: import kept local so the whole module still imports
+        if self.backend not in _MODEL_CLASS_NAMES:
+            msg = f"Unknown backend '{self.backend}'. Known: {list(_MODEL_CLASS_NAMES)}"
+            raise ValueError(msg)
+
+        # ANOMALIB-API: imports kept local so the whole module still imports
         # (and the rest of the app still runs) even before anomalib/torch
         # are installed, e.g. while just exploring the API endpoints.
-        from anomalib.deploy import TorchInferencer
+        import anomalib.models as anomalib_models
+        from anomalib.engine import Engine
 
-        self._inferencer = TorchInferencer(path=str(ckpt), device="auto")
+        model_cls = getattr(anomalib_models, _MODEL_CLASS_NAMES[self.backend])
+
+        # The model instance's weights are a placeholder - engine.predict()
+        # below loads the real trained weights from ckpt_path on every
+        # call, the same way training/common.py's engine.fit()/test() did.
+        self._model = model_cls()
+        self._engine = Engine()
+        self._ckpt_path = ckpt
 
     def predict(self, image: Image.Image) -> DetectionResult:
+        from anomalib.data import PredictDataset
+
         start = time.perf_counter()
-        img_array = np.array(image.convert("RGB"))
 
-        # ANOMALIB-API: TorchInferencer.predict returns an ImageResult-like
-        # object. Field names below (pred_score, pred_label, anomaly_map)
-        # match anomalib>=1.1's documented `ImageResult` dataclass.
-        result = self._inferencer.predict(img_array)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir) / "input.png"
+            image.convert("RGB").save(tmp_path)
 
-        score = float(result.pred_score)
-        anomaly_map = getattr(result, "anomaly_map", None)
+            dataset = PredictDataset(path=tmp_path)
+            predictions = self._engine.predict(
+                model=self._model,
+                dataset=dataset,
+                ckpt_path=str(self._ckpt_path),
+            )
+
+        if not predictions:
+            msg = (
+                f"engine.predict() returned no results for "
+                f"category='{self.category}', backend='{self.backend}'."
+            )
+            raise RuntimeError(msg)
+
+        # engine.predict() returns one ImageBatch per dataloader batch;
+        # PredictDataset + a single image -> one batch of size 1.
+        batch = predictions[0]
+
+        score = float(batch.pred_score[0])
+
+        anomaly_map = getattr(batch, "anomaly_map", None)
         if anomaly_map is not None:
-            anomaly_map = np.asarray(anomaly_map, dtype=np.float32)
+            anomaly_map = np.asarray(anomaly_map[0].detach().cpu(), dtype=np.float32)
+            anomaly_map = np.squeeze(anomaly_map)  # drop any leading channel dim -> (H, W)
             m_min, m_max = float(anomaly_map.min()), float(anomaly_map.max())
             if m_max > m_min:
                 anomaly_map = (anomaly_map - m_min) / (m_max - m_min)
