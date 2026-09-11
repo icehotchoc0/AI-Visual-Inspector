@@ -17,15 +17,23 @@ Both backbones are trained on all 4 categories (bottle, cable,
 metal_nut, screw) - real results below. PatchCore ran on CPU on
 2026-09-09 (~67 minutes total). EfficientAd ran on an RTX 3080 on
 2026-09-10, capped at 50 epochs/category (~15-20 min/category, under
-1.5 hours total). The demo GIF/video in `docs/demo/` still needs to be
-recorded once the Streamlit dashboard has been run against these
-checkpoints - that's next.
+1.5 hours total). The full pipeline (FastAPI backend + Streamlit
+dashboard + Anomalib inference + Qwen2.5-VL explanation) has been run
+end-to-end on real MVTec AD test images - see the demo below.
 
 ## Demo
 
-*(To be added: a GIF of the Streamlit dashboard classifying a real
-defective part from the MVTec AD test set, with the heatmap and the
-VLM's written report, once training has run. See `docs/demo/`.)*
+![AI-Visual-Inspector demo: a defective bottle sample is picked from
+the MVTec AD test set, the anomaly detector flags it FAIL with a
+heatmap over the damaged region, and the local VLM writes a short
+inspection report (defect type, likely cause,
+severity)](docs/demo/ai-visual-inspector-demo.gif)
+
+A `broken_large` bottle sample from the MVTec AD test set is
+classified FAIL (anomaly score 0.939), the heatmap localizes the
+damage, and Qwen2.5-VL (running locally via Ollama) writes the
+inspection report - defect type, likely cause, and severity - entirely
+on local hardware.
 
 ## How it works
 
@@ -142,13 +150,14 @@ installing dependencies, pulling the VLM model, downloading MVTec AD
   they're there to make the report readable, not to replace the anomaly
   score as the source of truth.
 - `backend/detector.py` and `training/common.py` target anomalib 2.6.1.
-  The `training/common.py` side (MVTecAD, Patchcore, Engine, and the
-  `image_AUROC`/`pixel_AUROC` result keys) is now confirmed correct by
-  an actual successful training run, not just documentation. The
-  inference side (`backend/detector.py`'s `TorchInferencer`) has not been
-  exercised yet - that happens once the FastAPI backend is actually run
-  against these checkpoints; if it errors, `SETUP_GUIDE.md ->
-  Troubleshooting` has the `PredictDataset` fallback.
+  Both sides are now confirmed correct by real runs, not just
+  documentation: `training/common.py` (MVTecAD, Patchcore, Engine, the
+  `image_AUROC`/`pixel_AUROC` result keys) by the training runs above,
+  and `backend/detector.py` by running the FastAPI backend against the
+  saved checkpoints end-to-end. `TorchInferencer` turned out not to
+  support the raw Lightning `.ckpt` files training produces, so
+  `detector.py` uses `Engine.predict()` + `PredictDataset` instead - see
+  `SETUP_GUIDE.md -> Troubleshooting` for the details.
 
 ## Companion projects
 
