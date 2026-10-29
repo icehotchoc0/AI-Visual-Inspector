@@ -1,158 +1,203 @@
 """
-FastAPI app for AI-Visual-Inspector.
+AI-Visual-Inspector - field-service photo verification microservice.
 
-    POST /inspect   - upload an image, get back a pass/fail verdict,
-                       heatmap overlay, and (if defective) a natural-
-                       language report.
-    GET  /health    - liveness + whether the VLM/Ollama is reachable.
-    GET  /metrics    - per-category benchmark numbers, read from
-                       training/results/metrics.json once training has
-                       been run (see training/evaluate.py).
+    POST /v1/inspections              JSON body (photos as base64)   -> InspectionResult
+    POST /v1/inspections/upload       multipart: job=<json>, files[] -> InspectionResult
+    GET  /v1/inspections              list recent inspections
+    GET  /v1/inspections/{id}         fetch a stored result
+    GET  /v1/categories               category catalogue (shots, defect codes)
+    GET  /health                      liveness + provider reachability
 
 Run from the project root:
-    uvicorn backend.app:app --host 0.0.0.0 --port 8000 --reload
+    uvicorn backend.app:app --host 0.0.0.0 --port 8000
 """
 from __future__ import annotations
 
-import io
 import json
-import time
-from pathlib import Path
+import logging
+from contextlib import asynccontextmanager
+from functools import lru_cache
+from typing import Optional
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
-from PIL import Image
+from pydantic import ValidationError
 
+from backend.auth import require_api_key
+from backend.categories import CategoryRegistry, load_registry
 from backend.config import settings
-from backend.detector import ModelNotTrainedError, get_detector, make_heatmap_overlay
-from backend.schemas import CategoryMetrics, InspectionResult, MetricsResponse
-from backend.vlm_explainer import explain_defect
+from backend.pipeline import PIPELINE_VERSION, InspectionPipeline, PipelineError
+from backend.schemas import CategoryInfo, InspectionListItem, InspectionRequest, InspectionResult, JobContext, PhotoInput, InspectionOptions
+from backend.store import SQLiteStore
+from backend.vlm import build_router
+
+log = logging.getLogger("inspector")
+
+
+# ------------------------------------------------------------- wiring --
+@lru_cache(maxsize=1)
+def get_registry() -> CategoryRegistry:
+    return load_registry(settings.categories_path)
+
+
+@lru_cache(maxsize=1)
+def get_store() -> SQLiteStore:
+    return SQLiteStore(settings.db_path)
+
+
+@lru_cache(maxsize=1)
+def get_vlm():
+    return build_router(settings)
+
+
+@lru_cache(maxsize=1)
+def get_pipeline() -> InspectionPipeline:
+    return InspectionPipeline(get_registry(), settings, vlm=get_vlm(), store=get_store())
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    if not settings.api_key_set:
+        log.warning("INSPECTOR_API_KEYS is empty - API authentication is DISABLED. Set it before exposing this service.")
+    reg = get_registry()
+    vlm = get_vlm()
+    log.info("categories: %s | vlm providers: %s | db: %s", reg.ids, vlm.names if vlm else "disabled", settings.db_path)
+    yield
+
 
 app = FastAPI(
     title="AI-Visual-Inspector",
-    description="Local-first industrial visual quality inspection: anomaly detection + VLM explanation.",
-    version="0.1.0",
+    description="현장 AS/설치 작업 사진 검증: 사진 품질·부정 제출·체크리스트는 규칙으로, 시각적 하자는 VLM(Claude → Ollama 폴백)으로 분석하고 규칙 엔진이 PASS/REVIEW/FAIL을 판정합니다.",
+    version=PIPELINE_VERSION,
+    lifespan=lifespan,
 )
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-METRICS_PATH = Path("training/results/metrics.json")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
+# ------------------------------------------------------------- routes --
 @app.get("/health")
 def health() -> dict:
-    ollama_reachable = False
-    ollama_error = None
-    if settings.vlm_enabled:
-        try:
-            import ollama
-
-            ollama.Client(host=settings.ollama_host).list()
-            ollama_reachable = True
-        except Exception as exc:
-            # Surfaced (not just swallowed) so this is diagnosable from the
-            # dashboard's own /health debug panel, without needing terminal
-            # access to the backend process - confirmed useful in practice
-            # on 2026-09-10, when this reported unreachable despite the
-            # exact same call working fine from a standalone script using
-            # the same venv (see SETUP_GUIDE.md Troubleshooting).
-            ollama_reachable = False
-            ollama_error = f"{type(exc).__name__}: {exc}"
-
+    vlm = get_vlm()
+    providers = {}
+    if vlm is not None:
+        for p in vlm.providers:
+            providers[p.name] = _probe_provider(p)
+    try:
+        store_stats = get_store().stats()
+    except Exception as exc:  # noqa: BLE001
+        store_stats = {"error": str(exc)}
     return {
         "status": "ok",
-        "ad_backend": settings.ad_backend,
-        "categories": settings.categories,
+        "version": PIPELINE_VERSION,
+        "auth_enabled": bool(settings.api_key_set),
+        "categories": get_registry().ids,
         "vlm_enabled": settings.vlm_enabled,
-        "ollama_host": settings.ollama_host,
-        "ollama_reachable": ollama_reachable,
-        "ollama_error": ollama_error,
+        "vlm_providers": providers,
+        "store": store_stats,
     }
 
 
-@app.get("/metrics", response_model=MetricsResponse)
-def metrics() -> MetricsResponse:
-    if not METRICS_PATH.exists():
-        # Honest empty state - no fabricated numbers before training has run.
-        entries = [
-            CategoryMetrics(category=c, model_backend=settings.ad_backend, trained=False)
-            for c in settings.categories
-        ]
-        return MetricsResponse(categories=entries)
+def _probe_provider(provider) -> dict:
+    """Cheap reachability probe - never calls the model."""
+    info: dict = {"model": getattr(provider, "model", None), "reachable": None, "error": None}
+    try:
+        if provider.name == "ollama":
+            import ollama
 
-    raw = json.loads(METRICS_PATH.read_text())
-    entries = [CategoryMetrics(**row) for row in raw]
-    return MetricsResponse(categories=entries)
+            ollama.Client(host=provider.host, timeout=3).list()
+            info["reachable"] = True
+        elif provider.name == "claude":
+            import os
+
+            info["reachable"] = bool(getattr(provider, "_client", None)) and bool(
+                os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN") or settings.anthropic_api_key
+            )
+            if not info["reachable"]:
+                info["error"] = "no ANTHROPIC_API_KEY / INSPECTOR_ANTHROPIC_API_KEY configured"
+    except Exception as exc:  # noqa: BLE001
+        info["reachable"] = False
+        info["error"] = f"{type(exc).__name__}: {exc}"
+    return info
 
 
-@app.post("/inspect", response_model=InspectionResult)
-async def inspect(
-    file: UploadFile = File(...),
-    category: str = "bottle",
-    backend: str | None = None,
+@app.get("/v1/categories", response_model=list[CategoryInfo], dependencies=[Depends(require_api_key)])
+def list_categories() -> list[CategoryInfo]:
+    out = []
+    for c in get_registry().all():
+        out.append(
+            CategoryInfo(
+                id=c.id, name=c.name, group=c.group, description=c.description.strip(),
+                shots=[s.model_dump() for s in c.shots],
+                defect_codes=[d.model_dump() for d in c.defect_rubric],
+                before_after_pairs=[list(p) for p in c.before_after_pairs],
+            )
+        )
+    return out
+
+
+@app.post("/v1/inspections", response_model=InspectionResult, dependencies=[Depends(require_api_key)])
+async def create_inspection(request: InspectionRequest) -> InspectionResult:
+    return await _run(request, None)
+
+
+@app.post("/v1/inspections/upload", response_model=InspectionResult, dependencies=[Depends(require_api_key)])
+async def create_inspection_upload(
+    job: str = Form(..., description="JobContext JSON"),
+    photos: Optional[str] = Form(default=None, description="JSON array of PhotoInput metadata (photo_id must equal the uploaded filename stem or filename)"),
+    options: Optional[str] = Form(default=None, description="InspectionOptions JSON"),
+    files: list[UploadFile] = File(...),
 ) -> InspectionResult:
-    backend = backend or settings.ad_backend
-    if category not in settings.categories:
-        raise HTTPException(400, f"Unknown category '{category}'. Known: {settings.categories}")
-
-    contents = await file.read()
     try:
-        image = Image.open(io.BytesIO(contents)).convert("RGB")
-    except Exception as exc:
-        raise HTTPException(400, f"Could not read image: {exc}") from exc
+        job_ctx = JobContext.model_validate_json(job)
+        opts = InspectionOptions.model_validate_json(options) if options else InspectionOptions()
+        photo_meta = {p["photo_id"]: p for p in json.loads(photos)} if photos else {}
+    except (ValidationError, json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise HTTPException(422, f"invalid form field: {exc}") from exc
+
+    images: dict[str, bytes] = {}
+    photo_inputs: list[PhotoInput] = []
+    for f in files:
+        name = f.filename or f"photo_{len(images)+1}"
+        stem = name.rsplit(".", 1)[0]
+        pid = stem if stem in photo_meta else (name if name in photo_meta else stem)
+        meta = dict(photo_meta.get(pid, {}))
+        meta["photo_id"] = pid
+        try:
+            photo_inputs.append(PhotoInput(**meta))
+        except ValidationError as exc:
+            raise HTTPException(422, f"invalid photo metadata for '{pid}': {exc}") from exc
+        images[pid] = await f.read()
 
     try:
-        detector = get_detector(category, backend)
-    except ModelNotTrainedError as exc:
-        raise HTTPException(409, str(exc)) from exc
-
-    detection = detector.predict(image)
-
-    overlay_b64 = None
-    description = cause = severity = None
-    explanation_source = "none"
-    explanation_latency_ms = None
-
-    if detection.heatmap is not None:
-        overlay_image = make_heatmap_overlay(image, detection.heatmap)
-        overlay_b64 = _image_to_base64(overlay_image)
-    else:
-        overlay_image = image
-
-    # Only ask the VLM to explain when there is actually something to
-    # explain - saves a model call and avoids inventing a story for a
-    # part the detector already found to be fine.
-    if detection.is_defective:
-        explanation = explain_defect(overlay_image, category)
-        description = explanation.defect_description
-        cause = explanation.likely_cause
-        severity = explanation.severity
-        explanation_source = explanation.source
-        explanation_latency_ms = explanation.latency_ms
-
-    return InspectionResult(
-        category=category,
-        model_backend=backend,
-        is_defective=detection.is_defective,
-        anomaly_score=detection.anomaly_score,
-        heatmap_png_base64=overlay_b64,
-        defect_description=description,
-        likely_cause=cause,
-        severity=severity,
-        explanation_source=explanation_source,
-        inference_latency_ms=detection.latency_ms,
-        explanation_latency_ms=explanation_latency_ms,
-    )
+        request = InspectionRequest(job=job_ctx, photos=photo_inputs, options=opts)
+    except ValidationError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return await _run(request, images)
 
 
-def _image_to_base64(image: Image.Image) -> str:
-    import base64
+async def _run(request: InspectionRequest, images: dict[str, bytes] | None) -> InspectionResult:
+    pipeline = get_pipeline()
+    try:
+        return await run_in_threadpool(pipeline.run, request, images)
+    except PipelineError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
-    buf = io.BytesIO()
-    image.save(buf, format="PNG")
-    return base64.b64encode(buf.getvalue()).decode("utf-8")
+
+@app.get("/v1/inspections", response_model=list[InspectionListItem], dependencies=[Depends(require_api_key)])
+def list_inspections(
+    limit: int = Query(default=50, ge=1, le=500),
+    job_id: Optional[str] = None,
+    category: Optional[str] = None,
+    verdict: Optional[str] = Query(default=None, pattern="^(PASS|REVIEW|FAIL)$"),
+) -> list[InspectionListItem]:
+    return get_store().list(limit=limit, job_id=job_id, category=category, verdict=verdict)
+
+
+@app.get("/v1/inspections/{inspection_id}", response_model=InspectionResult, dependencies=[Depends(require_api_key)])
+def get_inspection(inspection_id: str) -> InspectionResult:
+    result = get_store().get(inspection_id)
+    if result is None:
+        raise HTTPException(404, f"inspection '{inspection_id}' not found")
+    return result

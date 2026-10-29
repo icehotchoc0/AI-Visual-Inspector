@@ -1,0 +1,7 @@
+# Optional extras for the Anomalib anomaly-detection plugin and training/.
+torch>=2.1.0
+torchvision>=0.16.0
+anomalib>=2.0.0
+matplotlib>=3.8.0
+pandas>=2.2.0
+scikit-learn>=1.4.0

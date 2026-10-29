@@ -1,10 +1,12 @@
 """
-Deterministic anomaly-detection layer.
+Optional anomaly-detection plugin (Anomalib).
 
-This is the ONLY component allowed to decide "defective / not defective".
-Everything downstream (the VLM explainer) describes that decision in
-words - it never overrides it. Same "don't trust the agent's self-report,
-verify independently" principle used in AI-Dev-Crew's test verification.
+In the field-service pipeline this is *supporting evidence*, enabled per
+category for fixed-view shots only (config/categories.yaml -> anomaly).
+Free-form field photos vary too much in angle/lighting for a "trained on
+normal images" detector to be the verdict; the rule engine in
+backend/verdict.py treats its hits as REVIEW triggers. The MVTec benchmark
+scripts under training/ still exercise this class unchanged.
 
 Uses Anomalib's Engine.predict() + PredictDataset, NOT TorchInferencer.
 
@@ -47,11 +49,12 @@ class DetectionResult:
     latency_ms: float
 
 
-def _checkpoint_path(category: str, backend: str) -> Path:
-    # Expected layout produced by training/train_patchcore.py and
-    # training/train_efficientad.py:
-    #   backend/data/checkpoints/<category>/<backend>/model.ckpt
-    return settings.checkpoint_dir_path / category / backend / "model.ckpt"
+def _checkpoint_path(model_key: str, backend: str) -> Path:
+    # Layout produced by training/train_patchcore.py, train_efficientad.py
+    # (MVTec benchmark, model_key == MVTec category) and training/train_folder.py
+    # (our own data, model_key == categories.yaml -> anomaly.model_key):
+    #   backend/data/checkpoints/<model_key>/<backend>/model.ckpt
+    return settings.checkpoint_dir_path / model_key / backend / "model.ckpt"
 
 
 # Maps our own "backend" name (used in file paths / API params) to the
@@ -66,6 +69,7 @@ class AnomalyDetector:
     """Loads one trained Anomalib model for one (category, backend) pair."""
 
     def __init__(self, category: str, backend: str | None = None):
+        # `category` is the checkpoint model_key (kept for backwards compatibility).
         self.category = category
         self.backend = backend or settings.ad_backend
         self._model = None

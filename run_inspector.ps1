@@ -11,5 +11,5 @@ Start-Process powershell -ArgumentList "-NoExit", "-Command", ".\venv\Scripts\uv
 Start-Sleep -Seconds 3
 Start-Process powershell -ArgumentList "-NoExit", "-Command", ".\venv\Scripts\streamlit.exe run frontend/dashboard.py"
 
-Write-Host "Backend:   http://localhost:8000/docs" -ForegroundColor Green
+Write-Host "Backend:   http://localhost:8000/docs  (health: /health)" -ForegroundColor Green
 Write-Host "Dashboard: http://localhost:8501" -ForegroundColor Green

@@ -38,3 +38,7 @@ desktop.ini
 # is used without an explicit default_root_dir) - large, regenerable,
 # and contains a "latest" symlink that isn't readable through this mount.
 /results/
+
+# Field-service edition: runtime DB, datasets, eval reports (never commit photos)
+backend/data/inspector.db*
+backend/data/datasets/

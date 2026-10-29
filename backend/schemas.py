@@ -1,45 +1,165 @@
 """
-Pydantic response/request models for the /inspect and /metrics endpoints.
+Pydantic models shared by the API, the pipeline, and the checks.
+
+Vocabulary
+----------
+Finding   : one machine-readable observation about a photo or a job
+            (quality issue, suspected fraud, missing shot, visual defect,
+            anomaly score). Findings carry a `source` so a reviewer can see
+            whether a deterministic check or the VLM produced them.
+Verdict   : PASS | REVIEW | FAIL. Always computed by backend/verdict.py from
+            findings via explicit rules - never written by the VLM.
 """
-from typing import Optional
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Literal, Optional
+
 from pydantic import BaseModel, Field
+
+Verdict = Literal["PASS", "REVIEW", "FAIL"]
+PhotoStatus = Literal["OK", "FLAGGED", "REJECTED"]
+Severity = Literal["low", "medium", "high"]
+FindingSource = Literal["quality_check", "fraud_check", "checklist", "vlm", "anomaly_detector", "system"]
+FindingKind = Literal["quality", "fraud", "checklist", "defect", "anomaly", "consistency", "info"]
+Phase = Literal["before", "after", "any"]
+
+
+class Finding(BaseModel):
+    code: str = Field(description="machine-readable code, e.g. blurry, duplicate_cross_job, exposed_wiring")
+    kind: FindingKind
+    source: FindingSource
+    severity: Severity
+    confidence: float = Field(ge=0.0, le=1.0, default=1.0)
+    message: str = Field(description="사람이 읽는 한국어 설명")
+    photo_id: Optional[str] = Field(default=None, description="photo-level finding; None for job-level")
+    related_photo_ids: list[str] = Field(default_factory=list)
+    location_hint: Optional[str] = Field(default=None, description="e.g. '좌측 상단', '배관 이음부'")
+    evidence: Optional[str] = Field(default=None, description="what the check/VLM actually observed")
+    data: dict = Field(default_factory=dict, description="numeric details (blur score, hamming distance, ...)")
+
+
+# ---------------------------------------------------------------- request --
+class PhotoInput(BaseModel):
+    photo_id: str = Field(min_length=1, max_length=128)
+    image_base64: Optional[str] = Field(default=None, description="PNG/JPEG bytes, base64 (JSON API)")
+    declared_shot_type: Optional[str] = Field(default=None, description="shot id from the category, as declared by the technician app")
+    phase: Optional[Phase] = None
+    captured_at: Optional[datetime] = Field(default=None, description="client-reported capture time (EXIF is also read)")
+
+
+class JobContext(BaseModel):
+    job_id: str = Field(min_length=1, max_length=128)
+    category: str
+    technician_id: Optional[str] = None
+    customer_ref: Optional[str] = Field(default=None, description="opaque reference to the service order")
+    scheduled_start: Optional[datetime] = None
+    scheduled_end: Optional[datetime] = None
+    site_lat: Optional[float] = None
+    site_lon: Optional[float] = None
+    notes: Optional[str] = Field(default=None, max_length=2000, description="기사 메모 / 작업 내용 (VLM 컨텍스트)")
+
+
+class InspectionRequest(BaseModel):
+    job: JobContext
+    photos: list[PhotoInput] = Field(min_length=1)
+    options: "InspectionOptions" = Field(default_factory=lambda: InspectionOptions())
+
+
+class InspectionOptions(BaseModel):
+    run_vlm: bool = True
+    run_fraud_history: bool = Field(default=True, description="compare hashes against previously stored inspections")
+    return_thumbnails: bool = False
+    language: Literal["ko"] = "ko"
+
+
+# --------------------------------------------------------------- response --
+class PhotoQuality(BaseModel):
+    width: int
+    height: int
+    blur_score: float
+    brightness: float
+    contrast: float
+    passed: bool
+
+
+class PhotoMeta(BaseModel):
+    exif_datetime: Optional[datetime] = None
+    gps_lat: Optional[float] = None
+    gps_lon: Optional[float] = None
+    camera_model: Optional[str] = None
+    software: Optional[str] = None
+    perceptual_hash: str
+    sha256: str
+
+
+class PhotoAnalysis(BaseModel):
+    """What the VLM said about one photo (descriptive layer)."""
+    shot_type: Optional[str] = None
+    shot_confidence: float = 0.0
+    work_area_visible: Optional[bool] = None
+    scene_description: Optional[str] = None
+    provider: Optional[str] = Field(default=None, description="claude | ollama | none")
+    model: Optional[str] = None
+    latency_ms: Optional[float] = None
+
+
+class PhotoResult(BaseModel):
+    photo_id: str
+    status: PhotoStatus
+    declared_shot_type: Optional[str] = None
+    resolved_shot_type: Optional[str] = Field(default=None, description="declared if VLM agrees or VLM unavailable, else VLM's")
+    phase: Optional[Phase] = None
+    quality: PhotoQuality
+    meta: PhotoMeta
+    analysis: PhotoAnalysis
+    findings: list[Finding] = Field(default_factory=list)
+    anomaly_score: Optional[float] = None
+    thumbnail_png_base64: Optional[str] = None
+
+
+class ChecklistItem(BaseModel):
+    shot_id: str
+    name: str
+    required: bool
+    satisfied: bool
+    photo_ids: list[str] = Field(default_factory=list)
 
 
 class InspectionResult(BaseModel):
+    inspection_id: str
+    job_id: str
     category: str
-    model_backend: str = Field(description="patchcore | efficient_ad")
-
-    # These two fields ALWAYS come from the deterministic anomaly detector.
-    # The VLM is never allowed to change them - see vlm_explainer.py.
-    is_defective: bool
-    anomaly_score: float
-
-    heatmap_png_base64: Optional[str] = Field(
-        default=None, description="Base64 PNG of the original image with the anomaly heatmap overlaid"
-    )
-
-    # Natural-language layer - descriptive only, never authoritative.
-    defect_description: Optional[str] = None
-    likely_cause: Optional[str] = None
-    severity: Optional[str] = Field(default=None, description="low | medium | high")
-    explanation_source: str = Field(default="none", description="vlm | none | vlm_discarded_inconsistent")
-
-    inference_latency_ms: float
-    explanation_latency_ms: Optional[float] = None
+    category_name: str
+    verdict: Verdict
+    verdict_reasons: list[str] = Field(description="한국어 판정 근거 (순서 = 중요도)")
+    summary: str = Field(description="운영자/기사용 한 줄 요약 (한국어)")
+    photos: list[PhotoResult]
+    checklist: list[ChecklistItem]
+    job_findings: list[Finding] = Field(default_factory=list, description="job-level findings (missing shots, cross-photo fraud, before/after mismatch)")
+    stats: dict = Field(default_factory=dict)
+    vlm_provider_used: Optional[str] = None
+    created_at: datetime
+    pipeline_version: str
 
 
-class CategoryMetrics(BaseModel):
+class InspectionListItem(BaseModel):
+    inspection_id: str
+    job_id: str
     category: str
-    model_backend: str
-    image_auroc: Optional[float] = None
-    pixel_auroc: Optional[float] = None
-    num_test_images: Optional[int] = None
-    trained: bool = False
+    verdict: Verdict
+    created_at: datetime
+    num_photos: int
 
 
-class MetricsResponse(BaseModel):
-    categories: list[CategoryMetrics]
-    note: str = (
-        "Metrics are populated by training/evaluate.py after training runs on a GPU machine. "
-        "Until that has been run locally, entries show trained=false."
-    )
+class CategoryInfo(BaseModel):
+    id: str
+    name: str
+    group: str
+    description: str
+    shots: list[dict]
+    defect_codes: list[dict]
+    before_after_pairs: list[list[str]]
+
+
+InspectionRequest.model_rebuild()

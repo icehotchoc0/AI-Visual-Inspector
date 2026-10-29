@@ -1,11 +1,15 @@
 """
-Central configuration for AI-Visual-Inspector.
+Central configuration for AI-Visual-Inspector (field-service edition).
 
-Everything is read from environment variables (see .env.example), same
-pattern as AI-Portfolio-Agent's config.py: no hardcoded secrets, no
-hardcoded paths outside this file.
+Everything is read from environment variables / .env (see .env.example).
+Settings prefixed INSPECTOR_ are deliberately namespaced so they never
+collide with third-party env vars (e.g. Ollama's own OLLAMA_HOST, which
+configures the *server* bind address, not a client target).
 """
+from __future__ import annotations
+
 from pathlib import Path
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -13,43 +17,58 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # Ollama / VLM
-    #
-    # IMPORTANT: this reads from INSPECTOR_OLLAMA_HOST, not OLLAMA_HOST.
-    # OLLAMA_HOST is Ollama's own well-known env var for configuring what
-    # address the Ollama *server* binds to (commonly set to 0.0.0.0 to
-    # allow LAN access). Confirmed live on Ali's machine (2026-09-10): he
-    # had OLLAMA_HOST=0.0.0.0 set system-wide for that reason, and
-    # pydantic-settings' env vars > .env file precedence meant it silently
-    # overrode our .env's http://localhost:11434 here too - the backend's
-    # ollama.Client() then tried to connect *to* 0.0.0.0 (not a valid
-    # client target) and failed, while a one-off script using an explicit
-    # host string worked fine. Using a project-prefixed name avoids ever
-    # colliding with Ollama's own env var again, regardless of how any
-    # given machine has Ollama's server configured.
-    ollama_host: str = Field(default="http://localhost:11434", alias="INSPECTOR_OLLAMA_HOST")
-    vlm_model: str = "qwen2.5vl:7b"
+    # ---- Service -------------------------------------------------------
+    api_host: str = "0.0.0.0"
+    api_port: int = 8000
+    # Comma-separated list of accepted X-API-Key values. Empty => auth
+    # disabled (local development only; the app logs a warning).
+    api_keys: str = Field(default="", alias="INSPECTOR_API_KEYS")
+    db_path: str = Field(default="./backend/data/inspector.db", alias="INSPECTOR_DB_PATH")
+    categories_path: str = Field(default="./config/categories.yaml", alias="INSPECTOR_CATEGORIES_PATH")
+    max_photos_per_job: int = 30
+    max_image_bytes: int = 15 * 1024 * 1024
+    # Longest side images are resized to before being sent to the VLM.
+    vlm_image_max_side: int = 1568
+
+    # ---- VLM providers ---------------------------------------------------
+    # Ordered, comma-separated. First reachable provider wins; the next one
+    # is tried on transport errors / refusals. "claude,ollama" = Claude API
+    # primary with local Qwen2.5-VL fallback.
+    vlm_providers: str = Field(default="claude,ollama", alias="INSPECTOR_VLM_PROVIDERS")
     vlm_enabled: bool = True
 
-    # Anomaly detection
+    # Claude (Anthropic SDK reads ANTHROPIC_API_KEY itself; this optional
+    # override exists for containers that inject a differently named secret).
+    anthropic_api_key: str = Field(default="", alias="INSPECTOR_ANTHROPIC_API_KEY")
+    claude_model: str = Field(default="claude-opus-5-5", alias="INSPECTOR_CLAUDE_MODEL")
+    claude_effort: str = Field(default="medium", alias="INSPECTOR_CLAUDE_EFFORT")  # low|medium|high|xhigh|max
+    claude_max_tokens: int = 8192
+    claude_timeout_s: float = 120.0
+
+    # Ollama (local fallback)
+    ollama_host: str = Field(default="http://localhost:11434", alias="INSPECTOR_OLLAMA_HOST")
+    ollama_model: str = Field(default="qwen2.5vl:7b", alias="INSPECTOR_OLLAMA_MODEL")
+    ollama_timeout_s: float = 180.0
+
+    # ---- Optional anomaly-detection plugin (Anomalib) --------------------
     ad_backend: str = "patchcore"  # "patchcore" | "efficient_ad"
     ad_checkpoint_dir: str = "./backend/data/checkpoints"
     anomaly_threshold: float = 0.5
 
-    # Dataset
+    # ---- Training data (see docs/DATA_SPEC.md) -----------------------------
+    dataset_root: str = Field(default="./backend/data/datasets", alias="INSPECTOR_DATASET_ROOT")
+    # Legacy MVTec AD benchmark settings (training/train_*.py)
     mvtec_root: str = "./backend/data/mvtec_ad"
     mvtec_categories: str = "bottle,cable,metal_nut,screw"
 
-    # API
-    api_host: str = "0.0.0.0"
-    api_port: int = 8000
+    # ---- derived -----------------------------------------------------------
+    @property
+    def api_key_set(self) -> set[str]:
+        return {k.strip() for k in self.api_keys.split(",") if k.strip()}
 
-    # Optional email notification (mirrors AI-Portfolio-Agent)
-    smtp_host: str = ""
-    smtp_port: int = 587
-    smtp_user: str = ""
-    smtp_password: str = ""
-    notify_email: str = ""
+    @property
+    def provider_order(self) -> list[str]:
+        return [p.strip().lower() for p in self.vlm_providers.split(",") if p.strip()]
 
     @property
     def categories(self) -> list[str]:
@@ -62,6 +81,10 @@ class Settings(BaseSettings):
     @property
     def mvtec_root_path(self) -> Path:
         return Path(self.mvtec_root)
+
+    @property
+    def dataset_root_path(self) -> Path:
+        return Path(self.dataset_root)
 
 
 settings = Settings()

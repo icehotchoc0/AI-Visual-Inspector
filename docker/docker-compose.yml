@@ -1,7 +1,9 @@
-# Ollama is expected to run on the HOST (matches AI-Portfolio-Agent's
-# "local-only inference" design) - the backend container reaches it via
-# host.docker.internal. Mount trained checkpoints and the dataset from the
-# host so training (which needs a real GPU) stays outside the container.
+# AI-Visual-Inspector - field-service photo verification microservice.
+#
+# VLM: Claude API (primary, needs ANTHROPIC_API_KEY in ../.env) with an
+# optional local Ollama fallback running on the HOST (reached through
+# host.docker.internal). The anomaly-detection plugin is optional and needs
+# the GPU image (see Dockerfile.backend ANOMALY build arg).
 services:
   backend:
     build:
@@ -10,11 +12,32 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - OLLAMA_HOST=http://host.docker.internal:11434
+      - INSPECTOR_OLLAMA_HOST=http://host.docker.internal:11434
+      - INSPECTOR_DB_PATH=/app/backend/data/inspector.db
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - ../backend/data:/app/backend/data
-      - ../training/results:/app/training/results
+      - ../config:/app/config:ro
     env_file:
       - ../.env
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dashboard
+    ports:
+      - "8501:8501"
+    environment:
+      - INSPECTOR_API_URL=http://backend:8000
+    env_file:
+      - ../.env
+    depends_on:
+      - backend
+    restart: unless-stopped

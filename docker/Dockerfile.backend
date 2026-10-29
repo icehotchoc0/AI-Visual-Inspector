@@ -7,10 +7,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY requirements.txt requirements-anomaly.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
+# Optional: anomaly-detection plugin (large; CPU torch). Build with
+#   docker compose build --build-arg ANOMALY=1
+ARG ANOMALY=0
+RUN if [ "$ANOMALY" = "1" ]; then pip install --no-cache-dir -r requirements-anomaly.txt; fi
 
 COPY backend/ backend/
+COPY config/ config/
 COPY training/ training/
 
 EXPOSE 8000
