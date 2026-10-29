@@ -35,7 +35,7 @@ SOURCE_LABEL = {
     "quality_check": "품질 검사", "fraud_check": "부정 검사", "checklist": "체크리스트",
     "vlm": "AI 분석", "anomaly_detector": "이상 탐지", "system": "시스템",
 }
-GROUP_LABEL = {"appliance": "가전", "housing": "주거 시공"}
+GROUP_LABEL = {"appliance": "가전", "housing": "주거 시공", "commercial": "업무·교육 시설"}
 
 st.set_page_config(page_title=BRAND, page_icon=":material/photo_camera:", layout="wide")
 st.title(BRAND)

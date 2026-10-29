@@ -7,7 +7,7 @@
 # 각 카테고리 필드:
 #   id              : API에서 쓰는 식별자 (영문 소문자/언더스코어)
 #   name            : 화면 표시용 한국어 이름
-#   group           : appliance (가전) | housing (주거 시설 시공)
+#   group           : appliance (가전) | housing (주거 시설 시공) | commercial (업무·교육 시설)
 #   description     : VLM 프롬프트에 그대로 들어가는 작업 설명 (한국어)
 #   shots           : 이 작업에서 등장할 수 있는 사진 컷 목록
 #       id          : 컷 식별자. 기사 앱이 declared_shot_type 으로 보내는 값
@@ -180,3 +180,115 @@ categories:
       - {code: hardware_loose, name: 하드웨어 체결 불량, description: 힌지·손잡이 나사 누락 또는 헐거움, default_severity: high}
       - {code: wall_damage, name: 벽면 손상, description: 시공 중 생긴 벽지·석고 손상, default_severity: medium}
       - {code: debris_left, name: 잔재물/청소 미흡, description: 폼 잔여물·절단 자재·포장재 방치, default_severity: low}
+
+  - id: ventilation_fan
+    name: 환풍기 설치·교체
+    group: housing
+    description: >
+      욕실·주방 환풍기 신규 설치 또는 교체. 기존 환풍기 철거, 덕트(배기관) 연결, 본체 고정,
+      전원 결선, 마감, 작동 확인까지 포함.
+    shots:
+      - {id: site_before, name: 시공 전 현장, description: 기존 환풍기 또는 천장·벽 개구부가 보이는 시공 전 사진, required: true, phase: before}
+      - {id: duct_connection, name: 덕트 연결부, description: 환풍기 배기구와 덕트(배기관)가 연결·고정된 부위가 보이는 사진, required: true, phase: after}
+      - {id: fan_installed, name: 설치 완료, description: 천장·벽에 고정되고 커버(그릴)까지 장착된 환풍기 정면 사진, required: true, phase: after}
+      - {id: power_wiring, name: 전원 결선, description: 커버를 닫기 전 전원선 결선·접속부 사진, required: false, phase: after}
+      - {id: operation_test, name: 작동 확인, description: 전원을 켜 팬이 회전하거나 흡입이 확인되는 사진, required: false, phase: after}
+    before_after_pairs:
+      - [site_before, fan_installed]
+    defect_rubric:
+      - {code: exposed_wiring, name: 전선 노출, description: 피복이 벗겨졌거나 결선부가 마감 없이 노출된 전선, default_severity: high}
+      - {code: duct_disconnected, name: 덕트 미연결·이탈, description: 배기관이 환풍기 배기구에 연결되지 않았거나 빠져 있거나 테이핑·클램프 없이 걸쳐만 있음, default_severity: high}
+      - {code: unit_tilted, name: 본체 기울어짐, description: 환풍기 본체나 그릴이 천장·벽면과 평행하지 않게 기울어짐, default_severity: medium}
+      - {code: sealing_gap, name: 마감 틈, description: 본체 테두리와 천장·벽 사이에 틈이 보이거나 실리콘·마감재가 없음, default_severity: medium}
+      - {code: ceiling_damage, name: 천장·벽면 손상, description: 시공 중 생긴 천장재 파손·벽지 찢김·타공 주변 균열, default_severity: medium}
+      - {code: debris_left, name: 잔재물/청소 미흡, description: 철거한 구 환풍기·절단 덕트·포장재·먼지 방치, default_severity: low}
+
+  - id: water_purifier
+    name: 정수기 설치·관리
+    group: appliance
+    description: >
+      정수기 신규 설치, 이전 설치, 필터 교체. 직수 배관 분기(어댑터·밸브) 연결, 본체 거치,
+      누수 확인, 싱크대 타공 마감, 필터 교체 확인 포함.
+    shots:
+      - {id: site_before, name: 설치 전 위치, description: 정수기를 놓을 위치 또는 기존 정수기·싱크 하부가 보이는 설치 전 사진, required: true, phase: before}
+      - {id: water_line_connection, name: 직수 연결부, description: 싱크 하부 급수관 분기 어댑터·밸브·호스 연결부가 선명하게 보이는 사진, required: true, phase: after}
+      - {id: unit_installed, name: 설치 완료, description: 거치된 정수기 전체가 정면에서 보이는 사진, required: true, phase: after}
+      - {id: leak_test, name: 누수 확인, description: 물을 통수한 상태에서 연결부 주변이 건조한 것을 보여주는 사진, required: true, phase: after}
+      - {id: filter_replaced, name: 필터 교체, description: 장착된 새 필터 또는 신·구 필터 비교 사진, required: false, phase: after}
+      - {id: model_label, name: 모델 라벨, description: 모델명·시리얼 번호 라벨 사진, required: false, phase: any}
+    before_after_pairs:
+      - [site_before, unit_installed]
+    defect_rubric:
+      - {code: leak_visible, name: 누수, description: 연결부·호스·본체 하부의 물방울·물자국·젖은 흔적, default_severity: high}
+      - {code: hose_loose, name: 호스 체결 불량, description: 급수 호스가 어댑터·밸브에 느슨하게 끼워져 있거나 피팅이 완전히 체결되지 않음, default_severity: high}
+      - {code: hose_kinked, name: 호스 꺾임·눌림, description: 급수 호스가 급하게 꺾이거나 가구에 눌려 유로가 좁아짐, default_severity: medium}
+      - {code: sealing_gap, name: 타공 마감 불량, description: 싱크대 타공부에 그로밋·마감 없이 거친 절단면이 노출됨, default_severity: medium}
+      - {code: unit_tilted, name: 본체 기울어짐, description: 정수기 본체가 수평이 맞지 않거나 불안정하게 놓임, default_severity: low}
+      - {code: debris_left, name: 잔재물/청소 미흡, description: 구 필터·포장재·절단 호스·물기 방치, default_severity: low}
+
+  - id: dishwasher_install
+    name: 식기세척기 설치
+    group: appliance
+    description: >
+      빌트인·프리스탠딩 식기세척기 신규 설치. 급수·배수 호스 연결, 본체 삽입·고정, 수평 조정,
+      전면 패널·도어 정렬, 누수 테스트, 전원 연결 포함.
+    shots:
+      - {id: site_before, name: 설치 전 공간, description: 식기세척기를 넣을 싱크대 공간 또는 기존 기기가 보이는 설치 전 사진, required: true, phase: before}
+      - {id: water_drain_connection, name: 급수·배수 연결부, description: 급수 호스·배수 호스가 밸브와 배수관에 연결된 부위 사진, required: true, phase: after}
+      - {id: unit_installed, name: 설치 완료, description: 삽입·고정되고 전면 패널·도어가 정렬된 식기세척기 정면 전체 사진, required: true, phase: after}
+      - {id: leak_test, name: 누수 테스트, description: 시운전 후 호스 연결부와 싱크 하부 바닥이 건조한 것을 보여주는 사진, required: true, phase: after}
+      - {id: power_connection, name: 전원 연결, description: 전원 플러그·콘센트 연결부 사진, required: false, phase: after}
+      - {id: operation_test, name: 시운전, description: 전원이 켜져 디스플레이가 동작하는 사진, required: false, phase: after}
+    before_after_pairs:
+      - [site_before, unit_installed]
+    defect_rubric:
+      - {code: leak_visible, name: 누수, description: 호스 연결부·싱크 하부·기기 바닥의 물 고임이나 물자국, default_severity: high}
+      - {code: hose_loose, name: 호스 체결 불량, description: 급수·배수 호스가 느슨하거나 클램프가 누락됨, default_severity: high}
+      - {code: exposed_wiring, name: 전선 노출, description: 마감되지 않은 전선·접속부 노출, default_severity: high}
+      - {code: door_misaligned, name: 도어·패널 정렬 불량, description: 도어 또는 빌트인 전면 패널이 주변 가구와 단차·기울기가 있음, default_severity: medium}
+      - {code: panel_gap, name: 설치 틈, description: 본체와 싱크대 사이에 눈에 띄는 틈이 있거나 고정 브래킷이 없음, default_severity: medium}
+      - {code: cabinet_damage, name: 가구 손상, description: 설치 중 생긴 싱크대 몸통·문짝·상판의 긁힘·파손, default_severity: medium}
+      - {code: debris_left, name: 잔재물/청소 미흡, description: 포장재·스티로폼·공구·절단 호스 방치, default_severity: low}
+
+  - id: eboard_install
+    name: 전자칠판 설치
+    group: commercial
+    description: >
+      교실·회의실 전자칠판(대형 터치 디스플레이) 벽걸이 또는 스탠드 설치. 브래킷·앵커 고정,
+      본체 거치, 수평 조정, 전원·영상 케이블 정리, 전원 켜짐 확인 포함.
+    shots:
+      - {id: site_before, name: 설치 전 벽면, description: 전자칠판을 설치할 벽면 또는 기존 칠판·스탠드가 보이는 설치 전 사진, required: true, phase: before}
+      - {id: bracket_mounted, name: 브래킷 고정, description: 벽에 고정된 월마운트 브래킷과 앵커 볼트가 보이는 사진 (스탠드형은 스탠드 조립·고정부), required: true, phase: after}
+      - {id: board_installed, name: 설치 완료, description: 거치된 전자칠판 정면 전체가 보이는 사진, required: true, phase: after}
+      - {id: cable_finish, name: 케이블 정리, description: 전원·HDMI·네트워크 케이블이 몰딩·타이로 정리된 상태 사진, required: true, phase: after}
+      - {id: power_on_test, name: 전원 켜짐 확인, description: 화면이 켜져 초기 화면이나 터치 동작이 보이는 사진, required: false, phase: after}
+      - {id: level_check, name: 수평 확인, description: 수평계를 댄 상태의 사진, required: false, phase: after}
+    before_after_pairs:
+      - [site_before, board_installed]
+    defect_rubric:
+      - {code: bracket_unsecured, name: 브래킷 고정 불량, description: 앵커·볼트 누락, 헐거움, 벽 재질에 맞지 않는 고정, 브래킷 기울어짐, default_severity: high}
+      - {code: screen_damage, name: 화면 파손·흠집, description: 화면 유리의 금·깨짐·눈에 띄는 긁힘, default_severity: high}
+      - {code: board_tilted, name: 본체 기울어짐, description: 전자칠판이 수평이 맞지 않게 기울어짐, default_severity: medium}
+      - {code: cable_exposed, name: 케이블 정리 불량, description: 케이블이 정리 없이 늘어져 있거나 바닥을 가로질러 걸려 넘어질 위험, default_severity: medium}
+      - {code: wall_damage, name: 벽면 손상, description: 타공 주변 균열·석고 파손·벽지 찢김, default_severity: medium}
+      - {code: debris_left, name: 잔재물/청소 미흡, description: 포장재·스티로폼·타공 분진·공구 방치, default_severity: low}
+
+  - id: faucet_replace
+    name: 수전 교체
+    group: housing
+    description: >
+      주방·욕실 수전(수도꼭지) 교체. 기존 수전 철거, 급수 호스·앵글밸브 연결, 수전 고정, 실리콘 마감, 누수 확인 포함.
+    shots:
+      - {id: site_before, name: 교체 전 수전, description: 기존 수전과 주변(싱크·세면대)이 보이는 교체 전 사진, required: true, phase: before}
+      - {id: connection_detail, name: 연결부 상세, description: 싱크 하부 급수 호스와 앵글밸브 연결부가 선명하게 보이는 사진, required: true, phase: after}
+      - {id: faucet_installed, name: 교체 완료, description: 설치된 새 수전 전체가 정면에서 보이는 사진, required: true, phase: after}
+      - {id: leak_test, name: 누수 확인, description: 물을 튼 상태에서 수전 베이스와 하부 연결부가 건조한 것을 보여주는 사진, required: true, phase: after}
+    before_after_pairs:
+      - [site_before, faucet_installed]
+    defect_rubric:
+      - {code: leak_visible, name: 누수, description: 연결부·수전 베이스·싱크 하부의 물방울·물자국, default_severity: high}
+      - {code: joint_misaligned, name: 연결부 체결 불량, description: 호스가 비스듬히 체결되었거나 너트가 덜 조여짐, 테프론·실란트 과다 노출, default_severity: high}
+      - {code: faucet_tilted, name: 수전 기울어짐, description: 수전 본체가 싱크·세면대와 직각을 이루지 않고 기울어짐 또는 흔들림, default_severity: medium}
+      - {code: sealing_gap, name: 베이스 마감 불량, description: 수전 베이스와 상판 사이 실리콘 마감이 없거나 틈이 보임, default_severity: medium}
+      - {code: surface_damage, name: 싱크·세면대 손상, description: 교체 중 생긴 상판·세면대의 긁힘·파손, default_severity: medium}
+      - {code: debris_left, name: 잔재물/청소 미흡, description: 구 수전·포장재·절단 호스·물기 방치, default_severity: low}
