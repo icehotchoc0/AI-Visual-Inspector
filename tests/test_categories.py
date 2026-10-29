@@ -6,7 +6,7 @@ from backend.categories import Category, CategoryRegistry
 
 def test_registry_loads_all_categories(registry):
     ids = registry.ids
-    assert set(ids) == {"aircon_install", "washer_repair", "fridge_repair", "water_purifier", "dishwasher_install", "plumbing", "electrical", "door_install", "ventilation_fan", "faucet_replace", "eboard_install"}
+    assert set(ids) == {"aircon_install", "washer_repair", "fridge_repair", "water_purifier", "dishwasher_install", "plumbing", "electrical", "door_install", "ventilation_fan", "faucet_replace", "eboard_install", "range_hood_install", "induction_install"}
     assert "window_install" not in ids  # 당장 취급하지 않음 -> categories.optional.yaml
     for c in registry.all():
         assert c.required_shots, c.id
