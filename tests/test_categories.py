@@ -6,7 +6,8 @@ from backend.categories import Category, CategoryRegistry
 
 def test_registry_loads_all_categories(registry):
     ids = registry.ids
-    assert {"aircon_install", "washer_repair", "fridge_repair", "plumbing", "electrical", "door_install", "window_install"} <= set(ids)
+    assert set(ids) == {"aircon_install", "washer_repair", "fridge_repair", "plumbing", "electrical", "door_install"}
+    assert "window_install" not in ids  # 당장 취급하지 않음 -> categories.optional.yaml
     for c in registry.all():
         assert c.required_shots, c.id
         assert c.defect_rubric, c.id
@@ -45,3 +46,9 @@ def test_from_yaml_override(tmp_path):
     reg = CategoryRegistry.from_yaml(p)
     c = reg.get("t")
     assert c.quality.blur_threshold == 10 and c.quality.min_width == 100
+
+
+def test_optional_categories_file_still_valid():
+    from pathlib import Path
+    reg = CategoryRegistry.from_yaml(Path(__file__).resolve().parent.parent / "config" / "categories.optional.yaml")
+    assert set(reg.ids) == {"window_install"}
