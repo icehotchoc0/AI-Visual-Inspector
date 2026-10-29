@@ -1,5 +1,5 @@
 """
-AI-Visual-Inspector - field-service photo verification microservice.
+마이스터즈 AI 사진 검수 (AI-Visual-Inspector) - field-service photo verification microservice.
 
     POST /v1/inspections              JSON body (photos as base64)   -> InspectionResult
     POST /v1/inspections/upload       multipart: job=<json>, files[] -> InspectionResult
@@ -68,8 +68,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="AI-Visual-Inspector",
-    description="현장 AS/설치 작업 사진 검증: 사진 품질·부정 제출·체크리스트는 규칙으로, 시각적 하자는 VLM(Claude → Ollama 폴백)으로 분석하고 규칙 엔진이 PASS/REVIEW/FAIL을 판정합니다.",
+    title="마이스터즈 AI 사진 검수",
+    description="현장 AS·설치·시공 작업 사진을 제출 즉시 검사합니다. 사진 품질·부정 제출·체크리스트는 규칙으로, 시공 하자는 AI 비전 모델(Claude 기본, Ollama 폴백)로 분석하고 규칙 엔진이 PASS(합격)/REVIEW(검토 필요)/FAIL(불합격)을 판정합니다.",
     version=PIPELINE_VERSION,
     lifespan=lifespan,
 )

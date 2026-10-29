@@ -1,6 +1,6 @@
-# AI-Visual-Inspector
+# 마이스터즈 AI 사진 검수 (AI-Visual-Inspector)
 
-현장 AS·설치·시공 작업 사진을 자동 검증하는 **독립 마이크로서비스**입니다.
+마이스터즈의 현장 AS·설치·시공 작업 사진을 제출 즉시 자동 검증하는 **독립 마이크로서비스**입니다.
 기사가 제출한 작업 사진 묶음(작업 1건 = 사진 N장)을 받아 네 가지를 검사하고
 `PASS / REVIEW / FAIL` 판정과 한국어 근거를 돌려줍니다.
 
@@ -50,7 +50,7 @@ python -m venv venv && source venv/bin/activate      # Windows: .\venv\Scripts\A
 pip install -r requirements.txt
 cp .env.example .env                                  # ANTHROPIC_API_KEY, INSPECTOR_API_KEYS 설정
 uvicorn backend.app:app --host 0.0.0.0 --port 8000    # API: http://localhost:8000/docs
-streamlit run frontend/dashboard.py                   # 운영자 대시보드: http://localhost:8501
+streamlit run frontend/dashboard.py                   # 운영자 대시보드(마이스터즈 테마): http://localhost:8501
 pytest tests/                                         # 64 tests, GPU·네트워크 불필요
 ```
 

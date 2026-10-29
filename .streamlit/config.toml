@@ -1,0 +1,14 @@
+# 마이스터즈 디자인 토큰 (meisters-homecare/DESIGN.md) - 운영자 대시보드 테마
+[theme]
+primaryColor = "#1C2B4A"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F4F6F9"
+textColor = "#0F1A33"
+font = "sans serif"
+
+[browser]
+gatherUsageStats = false
+
+[client]
+# 시연 화면에서 Streamlit 기본 메뉴(Deploy 등)를 숨김
+toolbarMode = "minimal"

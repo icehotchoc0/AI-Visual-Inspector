@@ -5,7 +5,7 @@
 # relying on the new window inheriting an activated venv, which it
 # doesn't - each Start-Process window is a fresh shell with the base
 # PATH, not this one's activated venv).
-Write-Host "Starting AI-Visual-Inspector..." -ForegroundColor Cyan
+Write-Host "Starting Meisters AI Photo Inspector (AI-Visual-Inspector)..." -ForegroundColor Cyan
 
 Start-Process powershell -ArgumentList "-NoExit", "-Command", ".\venv\Scripts\uvicorn.exe backend.app:app --host 0.0.0.0 --port 8000"
 Start-Sleep -Seconds 3

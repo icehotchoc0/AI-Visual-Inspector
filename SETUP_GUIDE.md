@@ -1,4 +1,4 @@
-# Setup Guide - AI-Visual-Inspector (현장 사진 검증 서비스)
+# Setup Guide - 마이스터즈 AI 사진 검수 (AI-Visual-Inspector)
 
 ## 0. 요구 사항
 

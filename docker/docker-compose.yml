@@ -1,4 +1,4 @@
-# AI-Visual-Inspector - field-service photo verification microservice.
+# 마이스터즈 AI 사진 검수 (AI-Visual-Inspector) - field-service photo verification microservice.
 #
 # VLM: Claude API (primary, needs ANTHROPIC_API_KEY in ../.env) with an
 # optional local Ollama fallback running on the HOST (reached through
