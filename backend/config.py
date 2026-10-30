@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     # disabled (local development only; the app logs a warning).
     api_keys: str = Field(default="", alias="INSPECTOR_API_KEYS")
     db_path: str = Field(default="./backend/data/inspector.db", alias="INSPECTOR_DB_PATH")
+    # SQLAlchemy URL. Empty = sqlite file at db_path. Production: postgresql+psycopg://user:pw@host/db
+    database_url: str = Field(default="", alias="INSPECTOR_DATABASE_URL")
+    # Photo retention for the review workflow (see backend/photostore.py). Empty dir = keep no photos.
+    photo_store_dir: str = Field(default="", alias="INSPECTOR_PHOTO_STORE_DIR")
+    photo_store_policy: str = Field(default="review_only", alias="INSPECTOR_PHOTO_STORE_POLICY")  # review_only | all | off
+    photo_retention_days: int = Field(default=90, alias="INSPECTOR_PHOTO_RETENTION_DAYS")
     categories_path: str = Field(default="./config/categories", alias="INSPECTOR_CATEGORIES_PATH")  # 폴더(권장) 또는 단일 YAML
     max_photos_per_job: int = 30
     max_image_bytes: int = 15 * 1024 * 1024
@@ -73,6 +79,10 @@ class Settings(BaseSettings):
     @property
     def api_key_set(self) -> set[str]:
         return {k.strip() for k in self.api_keys.split(",") if k.strip()}
+
+    @property
+    def effective_database_url(self) -> str:
+        return self.database_url or f"sqlite:///{self.db_path}"
 
     @property
     def cors_origin_list(self) -> list[str]:

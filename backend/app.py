@@ -31,7 +31,8 @@ from backend.categories import CategoryRegistry, load_registry
 from backend.config import settings
 from backend.pipeline import PIPELINE_VERSION, InspectionPipeline, PipelineError
 from backend.schemas import CategoryInfo, GroupInfo, InspectionListItem, InspectionRequest, InspectionResult, JobContext, PhotoInput, InspectionOptions
-from backend.store import SQLiteStore
+from backend.photostore import PhotoStore
+from backend.store import Store
 from backend.vlm import build_router
 
 log = logging.getLogger("inspector")
@@ -44,8 +45,15 @@ def get_registry() -> CategoryRegistry:
 
 
 @lru_cache(maxsize=1)
-def get_store() -> SQLiteStore:
-    return SQLiteStore(settings.db_path)
+def get_store() -> Store:
+    return Store(settings.effective_database_url)
+
+
+@lru_cache(maxsize=1)
+def get_photo_store() -> PhotoStore | None:
+    if not settings.photo_store_dir or settings.photo_store_policy == "off":
+        return None
+    return PhotoStore(settings.photo_store_dir, settings.photo_retention_days, settings.photo_store_policy)
 
 
 @lru_cache(maxsize=1)
@@ -55,7 +63,7 @@ def get_vlm():
 
 @lru_cache(maxsize=1)
 def get_pipeline() -> InspectionPipeline:
-    return InspectionPipeline(get_registry(), settings, vlm=get_vlm(), store=get_store())
+    return InspectionPipeline(get_registry(), settings, vlm=get_vlm(), store=get_store(), photo_store=get_photo_store())
 
 
 @asynccontextmanager
@@ -68,6 +76,10 @@ async def lifespan(app: FastAPI):
     log.info("categories: %s | vlm providers: %s | db: %s | cors: %s | rate limit: %s/min", reg.ids, vlm.names if vlm else "disabled", settings.db_path, settings.cors_origin_list or "off", settings.rate_limit_per_minute)
     if "*" in settings.cors_origin_list:
         log.warning("INSPECTOR_CORS_ORIGINS=* allows any browser origin - do not use in production.")
+    ps = get_photo_store()
+    if ps is not None:
+        log.info("photo retention on: dir=%s policy=%s days=%d", ps.root, ps.policy, ps.retention_days)
+        ps.purge_expired()
     yield
 
 
@@ -225,3 +237,15 @@ def get_inspection(inspection_id: str) -> InspectionResult:
     if result is None:
         raise HTTPException(404, f"inspection '{inspection_id}' not found")
     return result
+
+
+@app.get("/v1/inspections/{inspection_id}/photos/{photo_id}", dependencies=[Depends(rate_limited)])
+def get_inspection_photo(inspection_id: str, photo_id: str) -> Response:
+    ps = get_photo_store()
+    if ps is None:
+        raise HTTPException(404, "photo retention is disabled (INSPECTOR_PHOTO_STORE_DIR)")
+    path = ps.find(inspection_id, photo_id)
+    if path is None:
+        raise HTTPException(404, "photo not retained for this inspection")
+    media = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "heic": "image/heic", "webp": "image/webp"}.get(path.suffix.lstrip(".").lower(), "application/octet-stream")
+    return Response(content=path.read_bytes(), media_type=media, headers={"Cache-Control": "private, max-age=300"})

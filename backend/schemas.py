@@ -116,6 +116,7 @@ class PhotoResult(BaseModel):
     findings: list[Finding] = Field(default_factory=list)
     anomaly_score: Optional[float] = None
     thumbnail_png_base64: Optional[str] = None
+    stored: bool = Field(default=False, description="original bytes retained for review (GET /v1/inspections/{id}/photos/{photo_id})")
 
 
 class ChecklistItem(BaseModel):
@@ -150,6 +151,8 @@ class InspectionListItem(BaseModel):
     verdict: Verdict
     created_at: datetime
     num_photos: int
+    review_verdict: Optional[Verdict] = None
+    technician_id: Optional[str] = None
 
 
 class GroupInfo(BaseModel):

@@ -62,6 +62,7 @@ class InspectionPipeline:
         vlm=None,
         store=None,
         *,
+        photo_store=None,
         anomaly_enabled: bool = True,
         max_workers: int = 4,
     ):
@@ -69,6 +70,7 @@ class InspectionPipeline:
         self.settings = settings
         self.vlm = vlm
         self.store = store
+        self.photo_store = photo_store
         self.anomaly_enabled = anomaly_enabled
         self.max_workers = max_workers
 
@@ -259,9 +261,20 @@ class InspectionPipeline:
             created_at=datetime.now(timezone.utc),
             pipeline_version=PIPELINE_VERSION,
         )
+        photos_stored = False
+        if self.photo_store is not None and self.photo_store.should_store(result.verdict):
+            try:
+                for p in result.photos:
+                    img, raw = decoded[p.photo_id]
+                    ext = (img.format or "jpg").lower().replace("jpeg", "jpg").replace("heif", "heic")
+                    self.photo_store.save(result.inspection_id, p.photo_id, raw, ext, result.created_at)
+                    p.stored = True
+                photos_stored = True
+            except Exception:  # noqa: BLE001 - retention failure must not lose the verdict
+                log.exception("failed to store photos for %s", result.inspection_id)
         if self.store is not None:
             try:
-                self.store.save(result)
+                self.store.save(result, technician_id=request.job.technician_id, photos_stored=photos_stored)
             except Exception:  # noqa: BLE001 - persistence failure must not lose the verdict
                 log.exception("failed to persist inspection %s", result.inspection_id)
         return result
