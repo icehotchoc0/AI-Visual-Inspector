@@ -81,3 +81,13 @@ def test_directory_loader_enabled_flag_and_order(tmp_path):
     (tmp_path / "g" / "parked.yaml").write_text("id: parked\nname: 보류\ngroup: g\nenabled: false\nshots: [{id: s, name: S, required: true}]\n", encoding="utf-8")
     reg = CategoryRegistry.from_path(tmp_path)
     assert reg.ids == ["first", "late"]
+
+
+def test_legacy_yaml_path_falls_back_to_folder(tmp_path, caplog):
+    root = tmp_path / "categories"
+    (root / "g").mkdir(parents=True)
+    (root / "g" / "one.yaml").write_text("id: one\nname: 하나\ngroup: g\nshots: [{id: s, name: S, required: true}]\n", encoding="utf-8")
+    reg = CategoryRegistry.from_path(tmp_path / "categories.yaml")  # old .env value, file gone
+    assert reg.ids == ["one"]
+    with pytest.raises(FileNotFoundError):
+        CategoryRegistry.from_path(tmp_path / "missing.yaml")

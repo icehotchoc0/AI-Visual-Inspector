@@ -15,12 +15,15 @@ A category file with `enabled: false` is validated but not registered.
 """
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
 import yaml
 from pydantic import BaseModel, Field, model_validator
+
+log = logging.getLogger(__name__)
 
 Phase = Literal["before", "after", "any"]
 Severity = Literal["low", "medium", "high"]
@@ -139,7 +142,15 @@ class CategoryRegistry:
     @classmethod
     def from_path(cls, path: str | Path) -> "CategoryRegistry":
         path = Path(path)
-        return cls.from_dir(path) if path.is_dir() else cls.from_yaml(path)
+        if path.is_dir():
+            return cls.from_dir(path)
+        if not path.exists() and path.suffix in (".yaml", ".yml") and path.with_suffix("").is_dir():
+            # Old single-file setting (config/categories.yaml) pointing at what is now a folder.
+            log.warning("INSPECTOR_CATEGORIES_PATH=%s no longer exists; loading folder %s instead. Update your .env.", path, path.with_suffix(""))
+            return cls.from_dir(path.with_suffix(""))
+        if not path.exists():
+            raise FileNotFoundError(f"category config not found: {path} (set INSPECTOR_CATEGORIES_PATH to the config/categories folder)")
+        return cls.from_yaml(path)
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "CategoryRegistry":
