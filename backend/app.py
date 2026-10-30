@@ -19,18 +19,22 @@ from contextlib import asynccontextmanager
 from functools import lru_cache
 from typing import Optional
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Response, UploadFile
+import base64
+
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Response, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from backend.auth import require_api_key
 from backend.observability import RequestIdMiddleware, configure_logging, metrics_payload, record_inspection
+from backend.queue import QueueWorker
 from backend.ratelimit import rate_limited
 from backend.categories import CategoryRegistry, load_registry
 from backend.config import settings
 from backend.pipeline import PIPELINE_VERSION, InspectionPipeline, PipelineError
-from backend.schemas import CategoryInfo, GroupInfo, InspectionListItem, InspectionRequest, InspectionResult, JobContext, PhotoInput, InspectionOptions, ReviewInfo, ReviewRequest, TechnicianStat
+from backend.schemas import CategoryInfo, GroupInfo, InspectionListItem, InspectionRequest, InspectionResult, JobContext, PhotoInput, InspectionOptions, ReviewInfo, ReviewRequest, TechnicianStat, JobStatus
 from backend.photostore import PhotoStore
 from backend.store import Store
 from backend.vlm import build_router
@@ -61,6 +65,13 @@ def get_vlm():
     return build_router(settings)
 
 
+_worker: QueueWorker | None = None
+
+
+def get_worker() -> QueueWorker | None:
+    return _worker
+
+
 @lru_cache(maxsize=1)
 def get_pipeline() -> InspectionPipeline:
     return InspectionPipeline(get_registry(), settings, vlm=get_vlm(), store=get_store(), photo_store=get_photo_store())
@@ -80,7 +91,16 @@ async def lifespan(app: FastAPI):
     if ps is not None:
         log.info("photo retention on: dir=%s policy=%s days=%d", ps.root, ps.policy, ps.retention_days)
         ps.purge_expired()
-    yield
+    global _worker
+    if settings.queue_workers > 0:
+        _worker = QueueWorker(get_store(), get_pipeline(), workers=settings.queue_workers, poll_interval_s=settings.queue_poll_interval_s, secret=settings.webhook_secret)
+        _worker.start()
+    try:
+        yield
+    finally:
+        if _worker is not None:
+            _worker.stop()
+            _worker = None
 
 
 app = FastAPI(
@@ -114,6 +134,8 @@ def health() -> dict:
         "vlm_enabled": settings.vlm_enabled,
         "vlm_providers": providers,
         "store": store_stats,
+        "queue_workers": settings.queue_workers,
+        "photo_retention": bool(get_photo_store()),
     }
 
 
@@ -170,18 +192,24 @@ def list_categories(group: Optional[str] = Query(default=None, description="그�
     return out
 
 
-@app.post("/v1/inspections", response_model=InspectionResult, dependencies=[Depends(rate_limited)])
-async def create_inspection(request: InspectionRequest) -> InspectionResult:
-    return await _run(request, None)
+@app.post("/v1/inspections", response_model=InspectionResult, dependencies=[Depends(rate_limited)], responses={202: {"model": JobStatus, "description": "mode=async: queued"}})
+async def create_inspection(
+    request: InspectionRequest,
+    mode: str = Query(default="sync", pattern="^(sync|async)$", description="async = 큐에 넣고 202 반환, 완료 시 callback_url 로 통보"),
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key", max_length=200),
+):
+    return await _submit(request, None, mode, idempotency_key)
 
 
-@app.post("/v1/inspections/upload", response_model=InspectionResult, dependencies=[Depends(rate_limited)])
+@app.post("/v1/inspections/upload", response_model=InspectionResult, dependencies=[Depends(rate_limited)], responses={202: {"model": JobStatus, "description": "mode=async: queued"}})
 async def create_inspection_upload(
     job: str = Form(..., description="JobContext JSON"),
     photos: Optional[str] = Form(default=None, description="JSON array of PhotoInput metadata (photo_id must equal the uploaded filename stem or filename)"),
     options: Optional[str] = Form(default=None, description="InspectionOptions JSON"),
     files: list[UploadFile] = File(...),
-) -> InspectionResult:
+    mode: str = Query(default="sync", pattern="^(sync|async)$"),
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key", max_length=200),
+):
     try:
         job_ctx = JobContext.model_validate_json(job)
         opts = InspectionOptions.model_validate_json(options) if options else InspectionOptions()
@@ -207,18 +235,58 @@ async def create_inspection_upload(
         request = InspectionRequest(job=job_ctx, photos=photo_inputs, options=opts)
     except ValidationError as exc:
         raise HTTPException(422, str(exc)) from exc
-    return await _run(request, images)
+    return await _submit(request, images, mode, idempotency_key)
 
 
-async def _run(request: InspectionRequest, images: dict[str, bytes] | None) -> InspectionResult:
+async def _submit(request: InspectionRequest, images: dict[str, bytes] | None, mode: str, idempotency_key: str | None):
+    store = get_store()
+    if idempotency_key:
+        # Same key -> same answer, whether the first call was sync or async.
+        existing = store.get_job_by_idempotency(idempotency_key)
+        if existing:
+            if existing["status"] == "done" and existing.get("inspection_id"):
+                prior = store.get(existing["inspection_id"])
+                if prior is not None:
+                    return prior if mode == "sync" else JSONResponse(status_code=202, content=_job_status(existing).model_dump(mode="json"))
+            if mode == "async" or existing["status"] in ("queued", "running"):
+                return JSONResponse(status_code=202, content=_job_status(existing).model_dump(mode="json"))
+    if mode == "async":
+        if images:  # multipart photos travel inside the queued request as base64
+            for p in request.photos:
+                if p.photo_id in images and not p.image_base64:
+                    p.image_base64 = base64.b64encode(images[p.photo_id]).decode("ascii")
+        job_key, created = store.enqueue(request.model_dump_json(), request.options.callback_url, idempotency_key)
+        if created:
+            log.info("inspection queued", extra={"event": "queued", "job_id": request.job.job_id, "category": request.job.category})
+        return JSONResponse(status_code=202, content=_job_status(store.get_job(job_key)).model_dump(mode="json"))
+    return await _run(request, images, idempotency_key)
+
+
+async def _run(request: InspectionRequest, images: dict[str, bytes] | None, idempotency_key: str | None = None) -> InspectionResult:
     pipeline = get_pipeline()
     try:
         result = await run_in_threadpool(pipeline.run, request, images)
     except PipelineError as exc:
         raise HTTPException(400, str(exc)) from exc
+    if idempotency_key:
+        get_store().record_sync_job(idempotency_key, result.inspection_id)
     record_inspection(result, mode="sync")
     log.info("inspection done", extra={"event": "inspection", "inspection_id": result.inspection_id, "job_id": result.job_id, "category": result.category, "verdict": result.verdict, "latency_ms": result.stats.get("latency_ms")})
     return result
+
+
+def _job_status(job: dict, include_result: bool = False) -> JobStatus:
+    result = get_store().get(job["inspection_id"]) if (include_result and job.get("inspection_id")) else None
+    return JobStatus(job_key=job["job_key"], status=job["status"], inspection_id=job.get("inspection_id"), error=job.get("error"), attempts=job.get("attempts", 0),
+                     created_at=job["created_at"], started_at=job.get("started_at"), finished_at=job.get("finished_at"), result=result)
+
+
+@app.get("/v1/jobs/{job_key}", response_model=JobStatus, dependencies=[Depends(rate_limited)])
+def get_job(job_key: str, include_result: bool = Query(default=True)) -> JobStatus:
+    job = get_store().get_job(job_key)
+    if job is None:
+        raise HTTPException(404, f"job '{job_key}' not found")
+    return _job_status(job, include_result=include_result)
 
 
 @app.get("/v1/inspections", response_model=list[InspectionListItem], dependencies=[Depends(rate_limited)])

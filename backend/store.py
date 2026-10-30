@@ -291,6 +291,21 @@ class Store(HashHistory):
         with self._begin() as conn:
             conn.execute(update(queue_jobs).where(queue_jobs.c.job_key == job_key).values(status="failed" if error else "done", inspection_id=inspection_id, error=error, finished_at=_now()))
 
+    def get_job_by_idempotency(self, idempotency_key: str) -> dict | None:
+        with self.engine.connect() as conn:
+            row = conn.execute(select(queue_jobs).where(queue_jobs.c.idempotency_key == idempotency_key)).mappings().fetchone()
+        return dict(row) if row else None
+
+    def record_sync_job(self, idempotency_key: str, inspection_id: str) -> None:
+        """Remember a synchronous call so a retry with the same Idempotency-Key returns the stored result."""
+        now = _now()
+        with self._begin() as conn:
+            exists = conn.execute(select(queue_jobs.c.job_key).where(queue_jobs.c.idempotency_key == idempotency_key)).fetchone()
+            if exists:
+                conn.execute(update(queue_jobs).where(queue_jobs.c.idempotency_key == idempotency_key).values(status="done", inspection_id=inspection_id, finished_at=now))
+            else:
+                conn.execute(queue_jobs.insert().values(job_key=f"s_{uuid.uuid4().hex[:16]}", idempotency_key=idempotency_key, status="done", inspection_id=inspection_id, request_json="{}", attempts=1, created_at=now, started_at=now, finished_at=now))
+
     def get_job(self, job_key: str) -> dict | None:
         with self.engine.connect() as conn:
             row = conn.execute(select(queue_jobs).where(queue_jobs.c.job_key == job_key)).mappings().fetchone()

@@ -71,6 +71,19 @@ class InspectionOptions(BaseModel):
     run_fraud_history: bool = Field(default=True, description="compare hashes against previously stored inspections")
     return_thumbnails: bool = False
     language: Literal["ko"] = "ko"
+    callback_url: Optional[str] = Field(default=None, max_length=2000, pattern=r"^https?://", description="async 모드에서 완료 시 결과를 POST 할 URL (HMAC 서명)")
+
+
+class JobStatus(BaseModel):
+    job_key: str
+    status: Literal["queued", "running", "done", "failed"]
+    inspection_id: Optional[str] = None
+    error: Optional[str] = None
+    attempts: int = 0
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    result: Optional["InspectionResult"] = None
 
 
 # --------------------------------------------------------------- response --
@@ -201,3 +214,4 @@ class CategoryInfo(BaseModel):
 
 
 InspectionRequest.model_rebuild()
+JobStatus.model_rebuild()

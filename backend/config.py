@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     cors_origins: str = Field(default="", alias="INSPECTOR_CORS_ORIGINS")
     # Requests per minute per API key (or client IP when auth is off). 0 = off.
     rate_limit_per_minute: int = Field(default=120, alias="INSPECTOR_RATE_LIMIT_PER_MINUTE")
+    # Async queue (POST /v1/inspections?mode=async). 0 workers = queue accepts jobs but nothing runs them here.
+    queue_workers: int = Field(default=2, alias="INSPECTOR_QUEUE_WORKERS")
+    queue_poll_interval_s: float = 0.5
+    # HMAC key for callback signatures (X-Inspector-Signature). Empty = unsigned callbacks.
+    webhook_secret: str = Field(default="", alias="INSPECTOR_WEBHOOK_SECRET")
+    callback_timeout_s: float = 10.0
     log_json: bool = Field(default=True, alias="INSPECTOR_LOG_JSON")
     log_level: str = Field(default="INFO", alias="INSPECTOR_LOG_LEVEL")
     metrics_enabled: bool = Field(default=True, alias="INSPECTOR_METRICS_ENABLED")
