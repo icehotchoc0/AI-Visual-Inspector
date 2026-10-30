@@ -112,7 +112,7 @@ curl -X POST http://localhost:8000/v1/inspections/upload \
 - **저장소**: SQLite(1대) 또는 PostgreSQL(복수 인스턴스), 선택적 사진 보관(REVIEW/FAIL 건, 보존일 자동 파기).
 - **VLM 제어**: 전역 동시 호출 제한, 작업당 토큰 상한, 공급자 회로 차단기, 프롬프트 캐싱, 로컬 전용(개인정보) 정책.
 - **관측·보안**: 요청 ID, JSON 로그, Prometheus `/metrics`, API 키별 속도 제한, CORS 화이트리스트, HEIC 지원.
-- 자세한 내용: [docs/OPERATIONS.md](docs/OPERATIONS.md), 개인정보·법무 체크리스트: [docs/PRIVACY.md](docs/PRIVACY.md).
+- 자세한 내용: [docs/OPERATIONS.md](docs/OPERATIONS.md), 개인정보·법무 체크리스트: [docs/PRIVACY.md](docs/PRIVACY.md), 모델 학습 전략: [docs/TRAINING_STRATEGY.md](docs/TRAINING_STRATEGY.md).
 
 ## 저장소 구조
 
