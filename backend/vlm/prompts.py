@@ -36,24 +36,12 @@ def _defect_catalogue(category: Category) -> str:
     return "\n".join(lines)
 
 
-def analyze_photo_prompt(
-    category: Category,
-    declared_shot_type: str | None,
-    phase: str | None,
-    technician_notes: str | None,
-) -> str:
-    declared = (
-        f"기사가 신고한 컷: {declared_shot_type} ({category.shot(declared_shot_type).name if category.shot(declared_shot_type) else '알 수 없는 컷'})"
-        if declared_shot_type
-        else "기사가 신고한 컷: 없음"
-    )
-    phase_txt = f"기사가 신고한 단계: {phase}" if phase else "기사가 신고한 단계: 없음"
-    notes = f"\n기사 메모: {technician_notes.strip()}" if technician_notes else ""
+def category_context(category: Category) -> str:
+    """Static per-category block: identical for every photo of a category, so
+    it is sent as a cacheable system block (prompt caching) and only the
+    short per-photo part below changes between requests."""
     return f"""작업 종류: {category.name} ({category.group})
 작업 설명: {category.description.strip()}
-
-{declared}
-{phase_txt}{notes}
 
 [이 작업에서 가능한 사진 컷]
 {_shot_catalogue(category)}
@@ -61,12 +49,32 @@ def analyze_photo_prompt(
 [이 작업에서 확인해야 할 시각적 하자]
 {_defect_catalogue(category)}
 
-지시:
+사진 1장을 분석할 때의 지시:
 1. 이 사진이 위 컷 목록 중 어디에 해당하는지 shot_type 으로 분류하고 confidence 를 주십시오. 기사가 신고한 컷은 참고만 하고, 사진 내용이 다르면 사진 내용을 따르십시오.
 2. 작업 대상(설비/부위)이 사진에 실제로 보이는지 work_area_visible 로 표시하십시오.
 3. 장면을 한국어 1~2문장으로 scene_description 에 기술하십시오.
 4. 사진에서 식별 가능한 하자를 defects 배열에 보고하십시오. 각 하자는 위 하자 코드 중 하나(없으면 other)를 쓰고, 어디에(location) 무엇이 보이는지(evidence) 구체적으로 적으십시오. 하자가 없으면 빈 배열을 반환하십시오.
 5. 사진 품질이나 구도 때문에 판단이 제한되면 visibility_note 에 적으십시오."""
+
+
+def analyze_photo_prompt(
+    category: Category,
+    declared_shot_type: str | None,
+    phase: str | None,
+    technician_notes: str | None,
+) -> str:
+    """Per-photo (volatile) part. Goes in the user message after the image."""
+    declared = (
+        f"기사가 신고한 컷: {declared_shot_type} ({category.shot(declared_shot_type).name if category.shot(declared_shot_type) else '알 수 없는 컷'})"
+        if declared_shot_type
+        else "기사가 신고한 컷: 없음"
+    )
+    phase_txt = f"기사가 신고한 단계: {phase}" if phase else "기사가 신고한 단계: 없음"
+    notes = f"\n기사 메모: {technician_notes.strip()}" if technician_notes else ""
+    return f"""{declared}
+{phase_txt}{notes}
+
+위 사진을 시스템 지시에 따라 분석하고 JSON 으로 답하십시오."""
 
 
 def analyze_photo_schema(category: Category) -> dict:

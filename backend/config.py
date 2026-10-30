@@ -56,6 +56,16 @@ class Settings(BaseSettings):
     # primary with local Qwen2.5-VL fallback.
     vlm_providers: str = Field(default="claude,ollama", alias="INSPECTOR_VLM_PROVIDERS")
     vlm_enabled: bool = True
+    # Global cap on simultaneous VLM calls across all requests (respects provider rate limits). 0 = unlimited.
+    vlm_max_concurrency: int = Field(default=4, alias="INSPECTOR_VLM_MAX_CONCURRENCY")
+    # Per-inspection token budget (input+output across all VLM calls). 0 = unlimited. Photos beyond
+    # the budget are not analysed and the inspection falls to REVIEW.
+    vlm_max_tokens_per_job: int = Field(default=0, alias="INSPECTOR_VLM_MAX_TOKENS_PER_JOB")
+    # Circuit breaker: skip a provider for cooldown_s after N consecutive failures. 0 = off.
+    vlm_breaker_failures: int = Field(default=5, alias="INSPECTOR_VLM_BREAKER_FAILURES")
+    vlm_breaker_cooldown_s: float = Field(default=60.0, alias="INSPECTOR_VLM_BREAKER_COOLDOWN_S")
+    # Force local providers only (privacy). Can also be set per category (privacy.local_only) or per request.
+    vlm_local_only: bool = Field(default=False, alias="INSPECTOR_VLM_LOCAL_ONLY")
 
     # Claude (Anthropic SDK reads ANTHROPIC_API_KEY itself; this optional
     # override exists for containers that inject a differently named secret).
@@ -63,6 +73,7 @@ class Settings(BaseSettings):
     claude_model: str = Field(default="claude-opus-5-5", alias="INSPECTOR_CLAUDE_MODEL")
     claude_effort: str = Field(default="medium", alias="INSPECTOR_CLAUDE_EFFORT")  # low|medium|high|xhigh|max
     claude_max_tokens: int = 8192
+    claude_prompt_cache: bool = Field(default=True, alias="INSPECTOR_CLAUDE_PROMPT_CACHE")
     claude_timeout_s: float = 120.0
 
     # Ollama (local fallback)

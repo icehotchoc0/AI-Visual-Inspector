@@ -79,7 +79,7 @@ def decide(
             continue
         if f.code == "before_after_different_location" and f.confidence >= 0.8:
             fail.append(f"전/후 사진이 서로 다른 장소로 판단됨: {f.message}")
-        elif f.code in ("before_after_different_location", "work_not_visible_after", "shot_type_mismatch"):
+        elif f.code in ("before_after_different_location", "work_not_visible_after", "shot_type_mismatch", "vlm_budget_exhausted"):
             review.append(f.message)
 
     # ---- 4. Visual defects (VLM, confidence-gated) ---------------------------

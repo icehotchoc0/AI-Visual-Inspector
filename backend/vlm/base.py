@@ -52,6 +52,14 @@ class VLMRequest:
     schema: dict
     max_tokens: int = 4096
     task: str = "generic"  # for logging/metrics: analyze_photo | compare_before_after
+    # Extra system text that is identical across many requests (e.g. the
+    # category catalogue). Providers that support prompt caching mark it
+    # cacheable; others just append it to the system prompt.
+    cacheable_context: str | None = None
+    local_only: bool = False  # only providers with .local == True may serve this request
+
+    def full_system(self) -> str:
+        return self.system if not self.cacheable_context else f"{self.system}\n\n{self.cacheable_context}"
 
 
 @dataclass
@@ -67,6 +75,7 @@ class VLMResponse:
 @runtime_checkable
 class VLMProvider(Protocol):
     name: str
+    local: bool  # True when inference never leaves our infrastructure
 
     def complete_json(self, request: VLMRequest) -> VLMResponse: ...
 

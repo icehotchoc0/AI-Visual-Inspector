@@ -72,6 +72,7 @@ class InspectionOptions(BaseModel):
     return_thumbnails: bool = False
     language: Literal["ko"] = "ko"
     callback_url: Optional[str] = Field(default=None, max_length=2000, pattern=r"^https?://", description="async 모드에서 완료 시 결과를 POST 할 URL (HMAC 서명)")
+    local_only: bool = Field(default=False, description="사진을 외부(클라우드) VLM 에 보내지 않고 로컬 공급자만 사용")
 
 
 class JobStatus(BaseModel):

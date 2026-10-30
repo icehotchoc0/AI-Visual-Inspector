@@ -14,6 +14,7 @@ from __future__ import annotations
 import base64
 import io
 import logging
+import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -43,11 +44,12 @@ from backend.schemas import (
 )
 from backend.verdict import decide, photo_status
 from backend.vlm.base import VLMRequest, VLMUnavailable, prepare_image
-from backend.vlm.prompts import COMPARE_SCHEMA, SYSTEM_PROMPT, analyze_photo_prompt, analyze_photo_schema, compare_before_after_prompt
+from backend.vlm.prompts import COMPARE_SCHEMA, SYSTEM_PROMPT, analyze_photo_prompt, analyze_photo_schema, category_context, compare_before_after_prompt
 
 log = logging.getLogger(__name__)
 
-PIPELINE_VERSION = "2.0.0"
+PIPELINE_VERSION = "2.1.0"
+PROMPT_VERSION = "2026-10-30.1"  # bump whenever backend/vlm/prompts.py changes; recorded in every result
 
 
 class PipelineError(ValueError):
@@ -122,16 +124,35 @@ class InspectionPipeline:
         # ---- VLM per photo (parallel) ----
         vlm_requested = bool(request.options.run_vlm)
         vlm_available = True
+        local_only = bool(request.options.local_only or category.privacy.local_only or getattr(self.settings, "vlm_local_only", False))
+        budget = int(getattr(self.settings, "vlm_max_tokens_per_job", 0) or 0)
+        spent = {"tokens": 0}
+        spent_lock = threading.Lock()
+        skipped_for_budget: list[str] = []
         analyses: dict[str, PhotoAnalysis] = {pid: PhotoAnalysis(provider="none") for pid in decoded}
-        vlm_calls, vlm_errors, tokens_in, tokens_out = 0, 0, 0, 0
+        vlm_calls, vlm_errors, tokens_in, tokens_out, cache_read = 0, 0, 0, 0, 0
         provider_used: str | None = None
         candidates = [pid for pid in decoded if pid not in rejected]
         if vlm_requested and self.vlm is not None and candidates:
             def _one(pid: str):
-                return pid, self._analyze_photo(category, photo_inputs[pid], decoded[pid][0], request.job.notes)
+                if budget and spent["tokens"] >= budget:
+                    skipped_for_budget.append(pid)
+                    return pid, "budget"
+                outcome = self._analyze_photo(category, photo_inputs[pid], decoded[pid][0], request.job.notes, local_only=local_only)
+                if outcome is not None:
+                    u = outcome[2]
+                    with spent_lock:
+                        spent["tokens"] += (u.get("input_tokens") or 0) + (u.get("output_tokens") or 0) + (u.get("cache_read_input_tokens") or 0)
+                return pid, outcome
 
             with ThreadPoolExecutor(max_workers=min(self.max_workers, len(candidates))) as pool:
                 for pid, outcome in pool.map(_one, candidates):
+                    if outcome == "budget":
+                        findings_by_photo[pid].append(
+                            Finding(code="vlm_budget_exhausted", kind="consistency", source="system", severity="medium", confidence=1.0, photo_id=pid,
+                                    message=f"사진 '{pid}'은(는) 작업당 AI 분석 토큰 상한({budget})에 도달해 분석되지 않았습니다. 수동 확인이 필요합니다.")
+                        )
+                        continue
                     vlm_calls += 1
                     if outcome is None:
                         vlm_errors += 1
@@ -142,10 +163,13 @@ class InspectionPipeline:
                     provider_used = provider_used or analysis.provider
                     tokens_in += usage.get("input_tokens") or 0
                     tokens_out += usage.get("output_tokens") or 0
+                    cache_read += usage.get("cache_read_input_tokens") or 0
             if vlm_calls and vlm_errors == vlm_calls:
                 vlm_available = False
         elif vlm_requested and self.vlm is None:
             vlm_available = False
+        if vlm_requested and local_only and self.vlm is not None and not self.vlm.has_local():
+            vlm_available = False  # policy says local only, but only cloud providers exist
 
         # ---- resolve shot types ----
         resolved: dict[str, str | None] = {}
@@ -211,7 +235,11 @@ class InspectionPipeline:
             for before_id, after_id in category.before_after_pairs:
                 if by_shot.get(before_id) and by_shot.get(after_id):
                     b_pid, a_pid = by_shot[before_id][0], by_shot[after_id][0]
-                    cmp_findings, usage = self._compare(category, before_id, after_id, b_pid, a_pid, decoded[b_pid][0], decoded[a_pid][0])
+                    if budget and spent["tokens"] >= budget:
+                        job_findings.append(Finding(code="vlm_budget_exhausted", kind="consistency", source="system", severity="medium", message=f"전/후 비교가 작업당 AI 분석 토큰 상한({budget})으로 생략되었습니다.", related_photo_ids=[b_pid, a_pid]))
+                        continue
+                    cmp_findings, usage = self._compare(category, before_id, after_id, b_pid, a_pid, decoded[b_pid][0], decoded[a_pid][0], local_only=local_only)
+                    spent["tokens"] += (usage.get("input_tokens") or 0) + (usage.get("output_tokens") or 0)
                     vlm_calls += 1
                     tokens_in += usage.get("input_tokens") or 0
                     tokens_out += usage.get("output_tokens") or 0
@@ -255,6 +283,10 @@ class InspectionPipeline:
                 "vlm_errors": vlm_errors,
                 "vlm_input_tokens": tokens_in,
                 "vlm_output_tokens": tokens_out,
+                "vlm_cache_read_tokens": cache_read,
+                "vlm_budget_skipped": len(skipped_for_budget),
+                "vlm_local_only": local_only,
+                "prompt_version": PROMPT_VERSION,
                 "latency_ms": round((time.perf_counter() - t0) * 1000.0, 1),
             },
             vlm_provider_used=provider_used,
@@ -280,13 +312,15 @@ class InspectionPipeline:
         return result
 
     # ------------------------------------------------------------- helpers --
-    def _analyze_photo(self, category: Category, photo: PhotoInput, image: Image.Image, notes: str | None):
+    def _analyze_photo(self, category: Category, photo: PhotoInput, image: Image.Image, notes: str | None, *, local_only: bool = False):
         req = VLMRequest(
             system=SYSTEM_PROMPT,
+            cacheable_context=category_context(category),
             prompt=analyze_photo_prompt(category, photo.declared_shot_type, photo.phase, notes),
             images=[prepare_image(image, self.settings.vlm_image_max_side)],
             schema=analyze_photo_schema(category),
             task="analyze_photo",
+            local_only=local_only,
         )
         try:
             resp = self.vlm.complete_json(req)
@@ -330,11 +364,11 @@ class InspectionPipeline:
             )
         return analysis, findings, resp.usage
 
-    def _compare(self, category: Category, before_id: str, after_id: str, b_pid: str, a_pid: str, b_img: Image.Image, a_img: Image.Image):
+    def _compare(self, category: Category, before_id: str, after_id: str, b_pid: str, a_pid: str, b_img: Image.Image, a_img: Image.Image, *, local_only: bool = False):
         b = prepare_image(b_img, self.settings.vlm_image_max_side)
         a = prepare_image(a_img, self.settings.vlm_image_max_side)
         b.label, a.label = "[사진 1: 작업 전]", "[사진 2: 작업 후]"
-        req = VLMRequest(system=SYSTEM_PROMPT, prompt=compare_before_after_prompt(category, before_id, after_id), images=[b, a], schema=COMPARE_SCHEMA, task="compare_before_after")
+        req = VLMRequest(system=SYSTEM_PROMPT, cacheable_context=category_context(category), prompt=compare_before_after_prompt(category, before_id, after_id), images=[b, a], schema=COMPARE_SCHEMA, task="compare_before_after", local_only=local_only)
         try:
             resp = self.vlm.complete_json(req)
         except VLMUnavailable as exc:

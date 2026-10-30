@@ -68,11 +68,14 @@ class FakeVLM:
 
     name = "fake"
     model = "fake-vlm"
+    local = True
 
-    def __init__(self, script: dict | None = None, compare: dict | None = None, fail_with: str | None = None):
+    def __init__(self, script: dict | None = None, compare: dict | None = None, fail_with: str | None = None, usage: dict | None = None, local: bool = True):
         self.script = script or {}
         self.compare = compare
         self.fail_with = fail_with
+        self.usage = usage or {"input_tokens": 100, "output_tokens": 20}
+        self.local = local
         self.calls: list[VLMRequest] = []
 
     def complete_json(self, request: VLMRequest) -> VLMResponse:
@@ -94,7 +97,7 @@ class FakeVLM:
             "visibility_note": "",
             "defects": [],
         }
-        return VLMResponse(data=dict(data), provider=self.name, model=self.model, latency_ms=1.0, usage={"input_tokens": 100, "output_tokens": 20})
+        return VLMResponse(data=dict(data), provider=self.name, model=self.model, latency_ms=1.0, usage=dict(self.usage))
 
 
 def analysis(shot_type: str, defects: list | None = None, conf: float = 0.9, visible: bool = True) -> dict:

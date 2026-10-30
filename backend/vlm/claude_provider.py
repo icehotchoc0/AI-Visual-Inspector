@@ -23,6 +23,7 @@ _FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
 class ClaudeProvider:
     name = "claude"
+    local = False
 
     def __init__(
         self,
@@ -32,6 +33,7 @@ class ClaudeProvider:
         timeout_s: float = 120.0,
         max_tokens: int = 8192,
         use_server_fallback: bool = True,
+        prompt_cache: bool = True,
     ):
         import anthropic  # local import: the service still boots without the SDK when Claude is not configured
 
@@ -39,6 +41,7 @@ class ClaudeProvider:
         self.effort = effort
         self.max_tokens = max_tokens
         self.use_server_fallback = use_server_fallback
+        self.prompt_cache = prompt_cache
         kwargs: dict = {"timeout": timeout_s, "max_retries": 2}
         if api_key:
             kwargs["api_key"] = api_key
@@ -63,6 +66,18 @@ class ClaudeProvider:
         blocks.append({"type": "text", "text": request.prompt})
         return blocks
 
+    def _system_blocks(self, request: VLMRequest):
+        """Stable text first, marked cacheable: the base system prompt and the
+        category catalogue repeat for every photo of a category, so the cache
+        serves them at ~10% of the input price (minimum cacheable prefix on
+        Claude Opus 5.5 is 512 tokens; shorter prefixes silently don't cache)."""
+        if not request.cacheable_context:
+            return request.system
+        blocks = [{"type": "text", "text": request.system}, {"type": "text", "text": request.cacheable_context}]
+        if self.prompt_cache:
+            blocks[-1]["cache_control"] = {"type": "ephemeral"}
+        return blocks
+
     def complete_json(self, request: VLMRequest) -> VLMResponse:
         import anthropic
 
@@ -70,7 +85,7 @@ class ClaudeProvider:
         kwargs: dict = dict(
             model=self.model,
             max_tokens=min(self.max_tokens, request.max_tokens) if request.max_tokens else self.max_tokens,
-            system=request.system,
+            system=self._system_blocks(request),
             messages=[{"role": "user", "content": self._content_blocks(request)}],
             output_config={
                 "format": {"type": "json_schema", "schema": request.schema},
@@ -123,6 +138,7 @@ class ClaudeProvider:
                 "input_tokens": getattr(response.usage, "input_tokens", None),
                 "output_tokens": getattr(response.usage, "output_tokens", None),
                 "cache_read_input_tokens": getattr(response.usage, "cache_read_input_tokens", None),
+                "cache_creation_input_tokens": getattr(response.usage, "cache_creation_input_tokens", None),
             }
         return VLMResponse(
             data=data,

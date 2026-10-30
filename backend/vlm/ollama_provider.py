@@ -17,6 +17,7 @@ from backend.vlm.base import VLMError, VLMRequest, VLMResponse
 
 class OllamaProvider:
     name = "ollama"
+    local = True
 
     def __init__(self, host: str = "http://localhost:11434", model: str = "qwen2.5vl:7b", timeout_s: float = 180.0):
         self.host = host
@@ -38,7 +39,7 @@ class OllamaProvider:
             response = client.chat(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": request.system},
+                    {"role": "system", "content": request.full_system()},
                     {"role": "user", "content": content, "images": images},
                 ],
                 format=request.schema,

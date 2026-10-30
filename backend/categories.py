@@ -64,6 +64,10 @@ class VerdictPolicy(BaseModel):
     missing_required_shot: Literal["fail", "review"] = "fail"
 
 
+class PrivacyPolicy(BaseModel):
+    local_only: bool = False  # never send this category's photos to a cloud VLM
+
+
 class AnomalyPlugin(BaseModel):
     enabled: bool = False
     model_key: str = ""
@@ -90,6 +94,7 @@ class Category(BaseModel):
     fraud: FraudThresholds = Field(default_factory=FraudThresholds)
     verdict: VerdictPolicy = Field(default_factory=VerdictPolicy)
     anomaly: AnomalyPlugin = Field(default_factory=AnomalyPlugin)
+    privacy: PrivacyPolicy = Field(default_factory=PrivacyPolicy)
 
     @model_validator(mode="after")
     def _check_references(self) -> "Category":
