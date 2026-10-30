@@ -152,10 +152,18 @@ class InspectionListItem(BaseModel):
     num_photos: int
 
 
+class GroupInfo(BaseModel):
+    id: str
+    name: str
+    order: int
+    category_ids: list[str] = Field(default_factory=list)
+
+
 class CategoryInfo(BaseModel):
     id: str
     name: str
     group: str
+    group_name: str
     description: str
     shots: list[dict]
     defect_codes: list[dict]

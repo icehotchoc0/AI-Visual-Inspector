@@ -1,0 +1,26 @@
+# 에어컨 설치
+id: aircon_install
+name: 에어컨 설치
+group: appliance
+description: >
+  가정용 벽걸이/스탠드 에어컨 신규 설치. 실내기 거치, 배관(냉매관·드레인) 연결,
+  실외기 설치(앵글/거치대), 배관 마감(테이핑/보온), 전원 연결, 시운전까지 포함.
+shots:
+  - {id: indoor_unit_before, name: 설치 전 실내 위치, description: 실내기를 설치할 벽면/위치가 보이는 사진(설치 전), required: true, phase: before}
+  - {id: indoor_unit_after, name: 실내기 설치 완료, description: 벽에 거치된 실내기 전체가 정면 또는 약간 측면에서 보이는 사진, required: true, phase: after}
+  - {id: outdoor_unit_after, name: 실외기 설치 완료, description: 실외기와 거치대(앵글)·고정 볼트가 보이는 사진, required: true, phase: after}
+  - {id: pipe_finish, name: 배관 마감, description: 냉매 배관과 드레인 호스의 보온재·테이핑·벽 관통부 마감이 보이는 사진, required: true, phase: after}
+  - {id: drain_test, name: 드레인 배수 확인, description: 드레인 호스 끝에서 물이 배출되는 모습 또는 배수 테스트 사진, required: false, phase: after}
+  - {id: power_connection, name: 전원 연결, description: 전원 플러그/차단기/전선 연결부 사진, required: false, phase: after}
+  - {id: remote_test, name: 시운전, description: 전원이 켜진 실내기 디스플레이 또는 리모컨 설정 온도가 보이는 사진, required: false, phase: after}
+before_after_pairs:
+  - [indoor_unit_before, indoor_unit_after]
+defect_rubric:
+  - {code: exposed_wiring, name: 전선 노출, description: 피복이 벗겨졌거나 결선부가 마감 없이 노출된 전선, default_severity: high}
+  - {code: pipe_insulation_missing, name: 배관 보온재 누락, description: 냉매 배관이 보온재 없이 맨 동관으로 노출됨 또는 보온재가 찢어져 틈이 있음, default_severity: medium}
+  - {code: wall_damage, name: 벽면 손상, description: 벽지 찢김·타공 주변 균열·시멘트 파손 등 설치로 생긴 벽면 손상, default_severity: medium}
+  - {code: unit_tilted, name: 실내기/실외기 기울어짐, description: 수평이 맞지 않아 눈에 띄게 기울어진 실내기 또는 실외기, default_severity: medium}
+  - {code: bracket_unsecured, name: 거치대 고정 불량, description: 실외기 앵글 볼트 누락·헐거움·녹슨 거치대, default_severity: high}
+  - {code: drain_leak, name: 누수/물 고임, description: 드레인 연결부·실내기 아래 물방울·물자국·물 고임, default_severity: high}
+  - {code: sealing_gap, name: 관통부 마감 불량, description: 벽 관통 구멍 주변에 실리콘/퍼티 마감이 없거나 틈이 보임, default_severity: medium}
+  - {code: debris_left, name: 잔재물/청소 미흡, description: 작업 후 남겨진 포장재·절단 배관 조각·먼지·공구, default_severity: low}

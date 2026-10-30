@@ -1,0 +1,22 @@
+# 세탁기 수리
+id: washer_repair
+name: 세탁기 수리
+group: appliance
+description: >
+  드럼/통돌이 세탁기 출장 수리. 고장 부위 확인, 부품 교체(모터·배수펌프·호스·보드 등),
+  조립 후 동작 확인.
+shots:
+  - {id: fault_before, name: 고장 부위(수리 전), description: 교체·수리할 부품 또는 고장 증상(누수·파손 등)이 보이는 수리 전 사진, required: true, phase: before}
+  - {id: replaced_part, name: 교체 부품, description: 새 부품과 탈거한 구 부품이 함께 보이거나 장착된 새 부품이 보이는 사진, required: true, phase: after}
+  - {id: assembled_after, name: 조립 완료, description: 외관 패널이 모두 닫히고 조립이 완료된 세탁기 전체 사진, required: true, phase: after}
+  - {id: operation_test, name: 동작 확인, description: 전원이 켜져 디스플레이에 동작 상태가 표시되는 사진, required: false, phase: after}
+  - {id: model_label, name: 모델 라벨, description: 세탁기 모델명·시리얼 번호 스티커가 보이는 사진, required: false, phase: any}
+before_after_pairs:
+  - [fault_before, assembled_after]
+defect_rubric:
+  - {code: exposed_wiring, name: 전선 노출, description: 마감되지 않은 전선·커넥터 노출, default_severity: high}
+  - {code: panel_gap, name: 패널 조립 불량, description: 외관 패널·상판·도어가 완전히 닫히지 않아 틈이 벌어진 상태, default_severity: medium}
+  - {code: hose_loose, name: 호스 체결 불량, description: 급수·배수 호스가 느슨하거나 클램프가 누락됨, default_severity: high}
+  - {code: water_leak, name: 누수 흔적, description: 바닥·본체 하부의 물 고임이나 물자국, default_severity: high}
+  - {code: scratch_dent, name: 외관 손상, description: 수리 과정에서 생긴 긁힘·찍힘·패널 변형, default_severity: low}
+  - {code: debris_left, name: 잔재물/청소 미흡, description: 작업 후 남겨진 구 부품·포장재·공구, default_severity: low}

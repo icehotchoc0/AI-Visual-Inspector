@@ -4,7 +4,7 @@ Deterministic photo-quality check.
 A photo that is blurry, too dark/bright, too small, or low-contrast cannot
 serve as evidence of the work, so it is REJECTED (the technician should
 retake it) before any model is asked to interpret it. All thresholds come
-from the category config (config/categories.yaml -> quality).
+from the category config (config/categories/<group>/<id>.yaml -> quality).
 """
 from __future__ import annotations
 

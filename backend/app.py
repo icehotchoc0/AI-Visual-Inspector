@@ -28,7 +28,7 @@ from backend.auth import require_api_key
 from backend.categories import CategoryRegistry, load_registry
 from backend.config import settings
 from backend.pipeline import PIPELINE_VERSION, InspectionPipeline, PipelineError
-from backend.schemas import CategoryInfo, InspectionListItem, InspectionRequest, InspectionResult, JobContext, PhotoInput, InspectionOptions
+from backend.schemas import CategoryInfo, GroupInfo, InspectionListItem, InspectionRequest, InspectionResult, JobContext, PhotoInput, InspectionOptions
 from backend.store import SQLiteStore
 from backend.vlm import build_router
 
@@ -122,13 +122,20 @@ def _probe_provider(provider) -> dict:
     return info
 
 
+@app.get("/v1/categories/groups", response_model=list[GroupInfo], dependencies=[Depends(require_api_key)])
+def list_category_groups() -> list[GroupInfo]:
+    reg = get_registry()
+    return [GroupInfo(id=g.id, name=g.name, order=g.order, category_ids=[c.id for c in reg.all(g.id)]) for g in reg.groups]
+
+
 @app.get("/v1/categories", response_model=list[CategoryInfo], dependencies=[Depends(require_api_key)])
-def list_categories() -> list[CategoryInfo]:
+def list_categories(group: Optional[str] = Query(default=None, description="그룹 id 로 필터 (appliance | housing | commercial ...)")) -> list[CategoryInfo]:
+    reg = get_registry()
     out = []
-    for c in get_registry().all():
+    for c in reg.all(group):
         out.append(
             CategoryInfo(
-                id=c.id, name=c.name, group=c.group, description=c.description.strip(),
+                id=c.id, name=c.name, group=c.group, group_name=reg.group_name(c.group), description=c.description.strip(),
                 shots=[s.model_dump() for s in c.shots],
                 defect_codes=[d.model_dump() for d in c.defect_rubric],
                 before_after_pairs=[list(p) for p in c.before_after_pairs],

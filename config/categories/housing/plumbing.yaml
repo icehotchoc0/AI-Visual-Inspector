@@ -1,0 +1,22 @@
+# 배관 시공
+id: plumbing
+name: 배관 시공
+group: housing
+description: >
+  주거 공간 급수·배수 배관 시공 및 수리. 배관 교체, 밸브·수전 연결, 누수 보수, 마감까지 포함.
+shots:
+  - {id: site_before, name: 시공 전 현장, description: 시공할 배관 구간 또는 누수 부위가 보이는 시공 전 사진, required: true, phase: before}
+  - {id: pipe_connection, name: 배관 연결부, description: 새로 연결된 이음부·밸브·피팅이 선명하게 보이는 사진, required: true, phase: after}
+  - {id: leak_test, name: 누수 테스트, description: 물을 흘려보낸 상태에서 이음부 주변이 건조한 것을 보여주는 사진, required: true, phase: after}
+  - {id: site_after, name: 시공 후 현장, description: 마감이 완료된 시공 구간 전체 사진, required: true, phase: after}
+  - {id: material_label, name: 자재 확인, description: 사용 자재(배관·밸브) 규격 라벨 사진, required: false, phase: any}
+before_after_pairs:
+  - [site_before, site_after]
+defect_rubric:
+  - {code: leak_visible, name: 누수, description: 이음부·배관 표면의 물방울·물자국·젖은 흔적, default_severity: high}
+  - {code: joint_misaligned, name: 이음부 불량, description: 피팅이 비스듬히 체결되었거나 완전히 삽입되지 않음·테프론/실란트 과다 노출, default_severity: high}
+  - {code: pipe_unsupported, name: 배관 지지 불량, description: 긴 구간의 배관이 클램프/행거 없이 늘어져 있음, default_severity: medium}
+  - {code: corrosion, name: 부식/녹, description: 재사용된 부품·주변 배관의 심한 녹이나 부식, default_severity: medium}
+  - {code: wall_damage, name: 벽/바닥 손상, description: 시공 중 생긴 타일 파손·벽면 균열·마감재 손상, default_severity: medium}
+  - {code: sealing_gap, name: 마감 불량, description: 관통부·수전 주변 실리콘 마감 누락 또는 틈, default_severity: medium}
+  - {code: debris_left, name: 잔재물/청소 미흡, description: 절단 배관·포장재·먼지 방치, default_severity: low}

@@ -1,0 +1,21 @@
+# 냉장고 수리
+id: fridge_repair
+name: 냉장고 수리
+group: appliance
+description: >
+  냉장고 출장 수리. 냉각 불량·소음·누수·도어 문제 등 고장 부위 확인, 부품 교체, 조립 후 동작 확인.
+shots:
+  - {id: fault_before, name: 고장 부위(수리 전), description: 고장 증상 또는 교체할 부품이 보이는 수리 전 사진, required: true, phase: before}
+  - {id: replaced_part, name: 교체 부품, description: 장착된 새 부품 또는 신·구 부품 비교 사진, required: true, phase: after}
+  - {id: assembled_after, name: 조립 완료, description: 커버·패널이 닫힌 수리 완료 상태 전체 사진, required: true, phase: after}
+  - {id: operation_test, name: 동작 확인, description: 디스플레이 온도 표시 또는 작동 상태가 보이는 사진, required: false, phase: after}
+  - {id: model_label, name: 모델 라벨, description: 모델명·시리얼 번호 라벨 사진, required: false, phase: any}
+before_after_pairs:
+  - [fault_before, assembled_after]
+defect_rubric:
+  - {code: exposed_wiring, name: 전선 노출, description: 마감되지 않은 전선·커넥터 노출, default_severity: high}
+  - {code: panel_gap, name: 커버/패널 조립 불량, description: 후면 커버·내부 패널이 완전히 체결되지 않음, default_severity: medium}
+  - {code: water_leak, name: 누수/결빙 흔적, description: 바닥 물 고임·내부 과도한 결빙·물자국, default_severity: medium}
+  - {code: door_misaligned, name: 도어 단차, description: 도어 높이가 맞지 않거나 밀착되지 않음, default_severity: medium}
+  - {code: scratch_dent, name: 외관 손상, description: 긁힘·찍힘·패널 변형, default_severity: low}
+  - {code: debris_left, name: 잔재물/청소 미흡, description: 구 부품·포장재·공구 방치, default_severity: low}

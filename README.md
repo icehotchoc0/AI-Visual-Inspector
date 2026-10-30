@@ -39,7 +39,7 @@
 - **결정적으로 잡을 수 있는 것은 모델에 맡기지 않습니다.** 중복·재사용·GPS·시각·블러는 해시와 수치로 잡습니다.
   VLM이 전부 죽어도 이 검사는 돌아가고, 그 경우 판정은 자동으로 `REVIEW`가 됩니다.
 - **카테고리는 설정입니다.** 가전(에어컨·정수기·식기세척기·주방후드·인덕션 설치, 세탁기·냉장고 수리), 주거 시공(배관, 전기, 도어, 환풍기, 수전), 업무·교육 시설(전자칠판) 13종이
-  `config/categories.yaml`에 정의되어 있습니다. 필수 컷·하자 루브릭·임계값을 추가하면 API·프롬프트·체크리스트가 함께 바뀝니다.
+  `config/categories/<그룹>/<id>.yaml`에 한 파일씩 정의되어 있습니다. 파일을 추가하면 API·프롬프트·체크리스트·대시보드가 함께 바뀌고, `enabled: false`로 보류할 수 있습니다.
 - **이상 탐지(Anomalib)는 선택 플러그인으로 격하.** 현장 사진은 구도가 매번 달라 "정상 이미지만으로 학습"하는 방식이
   주 판정이 될 수 없습니다. 실외기 거치대처럼 고정 구도 컷에만 카테고리별로 켜고, 결과는 REVIEW 트리거(보조 근거)로만 씁니다.
 
@@ -112,7 +112,7 @@ backend/
   app.py              FastAPI 라우트 (/v1/*), 인증, 의존성 조립
   pipeline.py         작업 1건 오케스트레이션 (품질→해시→VLM→체크리스트→전후비교→판정→저장)
   verdict.py          규칙 기반 PASS/REVIEW/FAIL (유일한 판정 지점)
-  categories.py       config/categories.yaml 로더 + 검증
+  categories.py       config/categories/ 폴더 로더 (그룹·enabled·order) + 검증
   schemas.py          API/도메인 모델 (Finding, PhotoResult, InspectionResult ...)
   store.py            SQLite (검사 이력, 사진 해시 인덱스)
   auth.py             X-API-Key
@@ -123,7 +123,8 @@ backend/
   vlm/prompts.py      한국어 프롬프트·JSON 스키마 빌더 (카테고리 YAML 기반)
   vlm/claude_provider.py / ollama_provider.py / router.py
   detector.py         선택 플러그인: Anomalib (고정 구도 컷)
-config/categories.yaml  카테고리 13종 + 임계값 기본값 (창호는 categories.optional.yaml 에 보관, 미로드)
+config/categories/        카테고리 13종: <그룹>/<id>.yaml 한 파일에 한 작업 종류
+  _defaults.yaml           공통 임계값, _groups.yaml 그룹 이름·순서 (창호는 enabled: false 로 보류)
 frontend/dashboard.py   운영자 대시보드 (업로드·컷 지정·결과·이력)
 training/
   train_folder.py        우리 데이터로 이상 탐지 플러그인 학습 (docs/DATA_SPEC.md 규격)

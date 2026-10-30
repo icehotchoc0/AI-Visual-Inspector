@@ -48,7 +48,36 @@ def test_from_yaml_override(tmp_path):
     assert c.quality.blur_threshold == 10 and c.quality.min_width == 100
 
 
-def test_optional_categories_file_still_valid():
+def test_directory_layout_groups_and_disabled(tmp_path):
     from pathlib import Path
-    reg = CategoryRegistry.from_yaml(Path(__file__).resolve().parent.parent / "config" / "categories.optional.yaml")
-    assert set(reg.ids) == {"window_install"}
+    import yaml
+
+    root = Path(__file__).resolve().parent.parent / "config" / "categories"
+    # every category file sits in the folder of its group and is named after its id
+    for f in root.glob("*/*.yaml"):
+        d = yaml.safe_load(f.read_text(encoding="utf-8"))
+        assert d["group"] == f.parent.name and d["id"] == f.stem, f
+    window = yaml.safe_load((root / "housing" / "window_install.yaml").read_text(encoding="utf-8"))
+    assert window["enabled"] is False  # parked, not loaded
+    reg = CategoryRegistry.from_path(root)
+    assert [g.id for g in reg.groups] == ["appliance", "housing", "commercial"]
+    assert reg.group_name("commercial") == "업무·교육 시설"
+    assert [c.group for c in reg.all()] == sorted([c.group for c in reg.all()], key=["appliance", "housing", "commercial"].index)
+    assert {c.id for c in reg.all("commercial")} == {"eboard_install"}
+
+
+def test_directory_loader_rejects_group_folder_mismatch(tmp_path):
+    (tmp_path / "_groups.yaml").write_text("groups: [{id: a, name: A, order: 1}]\n", encoding="utf-8")
+    (tmp_path / "a").mkdir()
+    (tmp_path / "a" / "x.yaml").write_text("id: x\nname: X\ngroup: b\nshots: [{id: s, name: S, required: true}]\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        CategoryRegistry.from_path(tmp_path)
+
+
+def test_directory_loader_enabled_flag_and_order(tmp_path):
+    (tmp_path / "g").mkdir()
+    (tmp_path / "g" / "late.yaml").write_text("id: late\nname: 나중\ngroup: g\norder: 50\nshots: [{id: s, name: S, required: true}]\n", encoding="utf-8")
+    (tmp_path / "g" / "first.yaml").write_text("id: first\nname: 먼저\ngroup: g\norder: 1\nshots: [{id: s, name: S, required: true}]\n", encoding="utf-8")
+    (tmp_path / "g" / "parked.yaml").write_text("id: parked\nname: 보류\ngroup: g\nenabled: false\nshots: [{id: s, name: S, required: true}]\n", encoding="utf-8")
+    reg = CategoryRegistry.from_path(tmp_path)
+    assert reg.ids == ["first", "late"]

@@ -34,7 +34,7 @@ MIN_TRAIN_IMAGES = 30
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--model-key", required=True, help="dataset folder name == categories.yaml anomaly.model_key")
+    parser.add_argument("--model-key", required=True, help="dataset folder name == category file anomaly.model_key")
     parser.add_argument("--backend", default=settings.ad_backend, choices=["patchcore", "efficient_ad"])
     parser.add_argument("--dataset-root", default=str(settings.dataset_root_path))
     parser.add_argument("--image-size", type=int, default=256)
@@ -89,7 +89,7 @@ def main() -> int:
     ckpt = out_dir / "model.ckpt"
     print(f"[train_folder] checkpoint: {ckpt} (exists={ckpt.exists()})")
     print(f"[train_folder] metrics: {json.dumps(metrics, ensure_ascii=False)}")
-    print("[train_folder] enable it in config/categories.yaml:\n"
+    print("[train_folder] enable it in the category file (config/categories/<group>/<id>.yaml):\n"
           f"  anomaly: {{enabled: true, model_key: {args.model_key}, shot_types: [<shot id>]}}")
     return 0
 

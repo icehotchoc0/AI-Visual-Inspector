@@ -1,0 +1,22 @@
+# 환풍기 설치·교체
+id: ventilation_fan
+name: 환풍기 설치·교체
+group: housing
+description: >
+  욕실·주방 환풍기 신규 설치 또는 교체. 기존 환풍기 철거, 덕트(배기관) 연결, 본체 고정,
+  전원 결선, 마감, 작동 확인까지 포함.
+shots:
+  - {id: site_before, name: 시공 전 현장, description: 기존 환풍기 또는 천장·벽 개구부가 보이는 시공 전 사진, required: true, phase: before}
+  - {id: duct_connection, name: 덕트 연결부, description: 환풍기 배기구와 덕트(배기관)가 연결·고정된 부위가 보이는 사진, required: true, phase: after}
+  - {id: fan_installed, name: 설치 완료, description: 천장·벽에 고정되고 커버(그릴)까지 장착된 환풍기 정면 사진, required: true, phase: after}
+  - {id: power_wiring, name: 전원 결선, description: 커버를 닫기 전 전원선 결선·접속부 사진, required: false, phase: after}
+  - {id: operation_test, name: 작동 확인, description: 전원을 켜 팬이 회전하거나 흡입이 확인되는 사진, required: false, phase: after}
+before_after_pairs:
+  - [site_before, fan_installed]
+defect_rubric:
+  - {code: exposed_wiring, name: 전선 노출, description: 피복이 벗겨졌거나 결선부가 마감 없이 노출된 전선, default_severity: high}
+  - {code: duct_disconnected, name: 덕트 미연결·이탈, description: 배기관이 환풍기 배기구에 연결되지 않았거나 빠져 있거나 테이핑·클램프 없이 걸쳐만 있음, default_severity: high}
+  - {code: unit_tilted, name: 본체 기울어짐, description: 환풍기 본체나 그릴이 천장·벽면과 평행하지 않게 기울어짐, default_severity: medium}
+  - {code: sealing_gap, name: 마감 틈, description: 본체 테두리와 천장·벽 사이에 틈이 보이거나 실리콘·마감재가 없음, default_severity: medium}
+  - {code: ceiling_damage, name: 천장·벽면 손상, description: 시공 중 생긴 천장재 파손·벽지 찢김·타공 주변 균열, default_severity: medium}
+  - {code: debris_left, name: 잔재물/청소 미흡, description: 철거한 구 환풍기·절단 덕트·포장재·먼지 방치, default_severity: low}

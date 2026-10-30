@@ -1,0 +1,25 @@
+# 인덕션 설치
+id: induction_install
+name: 인덕션 설치
+group: appliance
+description: >
+  빌트인·프리스탠딩 인덕션(전기레인지) 신규 설치 또는 교체. 기존 가스레인지·쿡탑 철거,
+  상판 타공 확인, 전용 전원(단독 회로·차단기) 결선, 본체 안착·고정, 마감, 작동 확인 포함.
+shots:
+  - {id: site_before, name: 시공 전 현장, description: 기존 가스레인지·쿡탑 또는 타공된 상판이 보이는 시공 전 사진, required: true, phase: before}
+  - {id: power_wiring, name: 전원 결선, description: 인덕션 전원선이 단자대·전용 콘센트에 결선된 부위가 선명하게 보이는 사진, required: true, phase: after}
+  - {id: breaker_panel, name: 분전반 차단기, description: 인덕션 전용 차단기와 라벨이 보이는 분전반 사진, required: true, phase: after}
+  - {id: unit_installed, name: 설치 완료, description: 상판에 안착되어 테두리 마감까지 끝난 인덕션 정면 전체 사진, required: true, phase: after}
+  - {id: gas_capped, name: 가스 마감, description: 기존 가스 배관을 철거·교체한 경우 가스 밸브 잠금·마감캡 사진, required: false, phase: after}
+  - {id: operation_test, name: 작동 확인, description: 전원이 켜져 화구 표시가 보이는 사진, required: false, phase: after}
+before_after_pairs:
+  - [site_before, unit_installed]
+defect_rubric:
+  - {code: exposed_wiring, name: 전선 노출, description: 마감되지 않은 전선·단자·접속부 노출, default_severity: high}
+  - {code: loose_terminal, name: 단자 체결 불량, description: 단자대에 전선이 헐겁게 물려 있거나 심선이 과도하게 노출됨, default_severity: high}
+  - {code: wire_undersized, name: 전선 규격 의심, description: 인덕션 용량에 비해 가늘어 보이는 전선이나 일반 멀티탭·연장선 사용, default_severity: high}
+  - {code: gas_uncapped, name: 가스 마감 불량, description: 철거한 가스 배관 끝이 마감캡 없이 열려 있거나 밸브가 잠기지 않음, default_severity: high}
+  - {code: unit_tilted, name: 안착·수평 불량, description: 본체가 상판에 고르게 안착되지 않아 한쪽이 들뜸, default_severity: medium}
+  - {code: sealing_gap, name: 테두리 마감 불량, description: 본체 테두리와 상판 사이 틈이 크거나 실리콘 마감이 없음, default_severity: medium}
+  - {code: surface_damage, name: 상판·가구 손상, description: 타공·설치 중 생긴 상판 파손·긁힘·싱크대 손상, default_severity: medium}
+  - {code: debris_left, name: 잔재물/청소 미흡, description: 철거 기기·포장재·타공 분진 방치, default_severity: low}

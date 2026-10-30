@@ -1,0 +1,23 @@
+# 정수기 설치·관리
+id: water_purifier
+name: 정수기 설치·관리
+group: appliance
+description: >
+  정수기 신규 설치, 이전 설치, 필터 교체. 직수 배관 분기(어댑터·밸브) 연결, 본체 거치,
+  누수 확인, 싱크대 타공 마감, 필터 교체 확인 포함.
+shots:
+  - {id: site_before, name: 설치 전 위치, description: 정수기를 놓을 위치 또는 기존 정수기·싱크 하부가 보이는 설치 전 사진, required: true, phase: before}
+  - {id: water_line_connection, name: 직수 연결부, description: 싱크 하부 급수관 분기 어댑터·밸브·호스 연결부가 선명하게 보이는 사진, required: true, phase: after}
+  - {id: unit_installed, name: 설치 완료, description: 거치된 정수기 전체가 정면에서 보이는 사진, required: true, phase: after}
+  - {id: leak_test, name: 누수 확인, description: 물을 통수한 상태에서 연결부 주변이 건조한 것을 보여주는 사진, required: true, phase: after}
+  - {id: filter_replaced, name: 필터 교체, description: 장착된 새 필터 또는 신·구 필터 비교 사진, required: false, phase: after}
+  - {id: model_label, name: 모델 라벨, description: 모델명·시리얼 번호 라벨 사진, required: false, phase: any}
+before_after_pairs:
+  - [site_before, unit_installed]
+defect_rubric:
+  - {code: leak_visible, name: 누수, description: 연결부·호스·본체 하부의 물방울·물자국·젖은 흔적, default_severity: high}
+  - {code: hose_loose, name: 호스 체결 불량, description: 급수 호스가 어댑터·밸브에 느슨하게 끼워져 있거나 피팅이 완전히 체결되지 않음, default_severity: high}
+  - {code: hose_kinked, name: 호스 꺾임·눌림, description: 급수 호스가 급하게 꺾이거나 가구에 눌려 유로가 좁아짐, default_severity: medium}
+  - {code: sealing_gap, name: 타공 마감 불량, description: 싱크대 타공부에 그로밋·마감 없이 거친 절단면이 노출됨, default_severity: medium}
+  - {code: unit_tilted, name: 본체 기울어짐, description: 정수기 본체가 수평이 맞지 않거나 불안정하게 놓임, default_severity: low}
+  - {code: debris_left, name: 잔재물/청소 미흡, description: 구 필터·포장재·절단 호스·물기 방치, default_severity: low}

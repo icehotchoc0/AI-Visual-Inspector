@@ -42,6 +42,12 @@ def test_categories(client):
     assert "plumbing" in ids
     air = next(c for c in r.json() if c["id"] == "aircon_install")
     assert any(s["required"] for s in air["shots"]) and air["defect_codes"]
+    assert air["group"] == "appliance" and air["group_name"] == "가전"
+    only_housing = client.get("/v1/categories", params={"group": "housing"}).json()
+    assert only_housing and all(c["group"] == "housing" for c in only_housing)
+    groups = client.get("/v1/categories/groups").json()
+    assert [g["id"] for g in groups] == ["appliance", "housing", "commercial"]
+    assert "plumbing" in next(g for g in groups if g["id"] == "housing")["category_ids"]
 
 
 def test_json_inspection_roundtrip(client):

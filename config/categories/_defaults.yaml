@@ -1,0 +1,35 @@
+# ---------------------------------------------------------------------------
+# 검사 카테고리 정의 (마이스터즈 AI 사진 검수)
+#
+# 폴더 구조: config/categories/<그룹>/<카테고리 id>.yaml  (한 파일 = 작업 종류 하나)
+#   _defaults.yaml : 모든 카테고리에 적용되는 품질·부정·판정 임계값 기본값
+#   _groups.yaml   : 그룹 id → 표시 이름, 정렬 순서
+#
+# 카테고리 파일 필드:
+#   id              : API 식별자 (파일명과 동일하게 유지)
+#   name            : 화면 표시용 한국어 이름
+#   group           : 폴더명과 동일 (_groups.yaml 에 정의된 id)
+#   enabled         : false 면 로드하지 않음 (당장 취급하지 않는 작업 종류 보류용). 기본 true
+#   description     : VLM 프롬프트에 그대로 들어가는 작업 설명
+#   shots           : 사진 컷 목록 (id, name, description, required, phase: before|after|any)
+#   before_after_pairs : 전/후 비교가 필요한 컷 쌍
+#   defect_rubric   : VLM 이 찾을 시각적 하자 (code, name, description, default_severity)
+#   quality / fraud / verdict : _defaults.yaml 값을 필드 단위로 덮어쓰기 (선택)
+#   anomaly         : 고정 구도 컷용 이상 탐지 플러그인 (선택)
+# ---------------------------------------------------------------------------
+
+defaults:
+  quality:
+    min_width: 640
+    min_height: 480
+    blur_threshold: 60.0
+    dark_threshold: 45.0
+    bright_threshold: 225.0
+    low_contrast_threshold: 18.0
+  fraud:
+    duplicate_hamming_max: 6
+    near_duplicate_hamming_max: 12
+    gps_max_spread_km: 0.5
+  verdict:
+    min_defect_confidence: 0.6
+    missing_required_shot: fail

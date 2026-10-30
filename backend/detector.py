@@ -2,7 +2,7 @@
 Optional anomaly-detection plugin (Anomalib).
 
 In the field-service pipeline this is *supporting evidence*, enabled per
-category for fixed-view shots only (config/categories.yaml -> anomaly).
+category for fixed-view shots only (config/categories/<group>/<id>.yaml -> anomaly).
 Free-form field photos vary too much in angle/lighting for a "trained on
 normal images" detector to be the verdict; the rule engine in
 backend/verdict.py treats its hits as REVIEW triggers. The MVTec benchmark
@@ -52,7 +52,7 @@ class DetectionResult:
 def _checkpoint_path(model_key: str, backend: str) -> Path:
     # Layout produced by training/train_patchcore.py, train_efficientad.py
     # (MVTec benchmark, model_key == MVTec category) and training/train_folder.py
-    # (our own data, model_key == categories.yaml -> anomaly.model_key):
+    # (our own data, model_key == category file -> anomaly.model_key):
     #   backend/data/checkpoints/<model_key>/<backend>/model.ckpt
     return settings.checkpoint_dir_path / model_key / backend / "model.ckpt"
 

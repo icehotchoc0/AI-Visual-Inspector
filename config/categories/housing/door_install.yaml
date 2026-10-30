@@ -1,0 +1,22 @@
+# 도어 설치
+id: door_install
+name: 도어 설치
+group: housing
+description: >
+  실내문·현관문·중문 설치 및 교체. 문틀 시공, 문짝 거치, 힌지·손잡이·잠금장치 설치, 마감 포함.
+shots:
+  - {id: site_before, name: 시공 전 현장, description: 기존 문 또는 비어 있는 개구부의 시공 전 사진, required: true, phase: before}
+  - {id: frame_install, name: 문틀 시공, description: 설치된 문틀과 고정부(앵커·폼)가 보이는 사진, required: false, phase: after}
+  - {id: door_closed, name: 설치 완료(닫힘), description: 문이 닫힌 상태의 정면 전체 사진, required: true, phase: after}
+  - {id: door_open, name: 설치 완료(열림), description: 문이 열린 상태로 힌지·문틀 측면이 보이는 사진, required: true, phase: after}
+  - {id: hardware_detail, name: 하드웨어 상세, description: 손잡이·잠금장치·힌지 클로즈업 사진, required: false, phase: after}
+before_after_pairs:
+  - [site_before, door_closed]
+defect_rubric:
+  - {code: door_gap_uneven, name: 문틈 불균일, description: 문과 문틀 사이 틈이 위아래/좌우로 눈에 띄게 다름, default_severity: medium}
+  - {code: frame_misaligned, name: 문틀 기울어짐, description: 문틀이 수직/수평이 맞지 않음, default_severity: high}
+  - {code: surface_damage, name: 표면 손상, description: 문짝·문틀의 긁힘·찍힘·필름 벗겨짐, default_severity: low}
+  - {code: sealing_gap, name: 마감 불량, description: 문틀과 벽 사이 실리콘/몰딩 마감 누락 또는 틈, default_severity: medium}
+  - {code: hardware_loose, name: 하드웨어 체결 불량, description: 힌지·손잡이 나사 누락 또는 헐거움, default_severity: high}
+  - {code: wall_damage, name: 벽면 손상, description: 시공 중 생긴 벽지·석고 손상, default_severity: medium}
+  - {code: debris_left, name: 잔재물/청소 미흡, description: 폼 잔여물·절단 자재·포장재 방치, default_severity: low}

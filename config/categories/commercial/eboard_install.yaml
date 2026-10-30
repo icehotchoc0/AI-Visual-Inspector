@@ -1,0 +1,23 @@
+# 전자칠판 설치
+id: eboard_install
+name: 전자칠판 설치
+group: commercial
+description: >
+  교실·회의실 전자칠판(대형 터치 디스플레이) 벽걸이 또는 스탠드 설치. 브래킷·앵커 고정,
+  본체 거치, 수평 조정, 전원·영상 케이블 정리, 전원 켜짐 확인 포함.
+shots:
+  - {id: site_before, name: 설치 전 벽면, description: 전자칠판을 설치할 벽면 또는 기존 칠판·스탠드가 보이는 설치 전 사진, required: true, phase: before}
+  - {id: bracket_mounted, name: 브래킷 고정, description: 벽에 고정된 월마운트 브래킷과 앵커 볼트가 보이는 사진 (스탠드형은 스탠드 조립·고정부), required: true, phase: after}
+  - {id: board_installed, name: 설치 완료, description: 거치된 전자칠판 정면 전체가 보이는 사진, required: true, phase: after}
+  - {id: cable_finish, name: 케이블 정리, description: 전원·HDMI·네트워크 케이블이 몰딩·타이로 정리된 상태 사진, required: true, phase: after}
+  - {id: power_on_test, name: 전원 켜짐 확인, description: 화면이 켜져 초기 화면이나 터치 동작이 보이는 사진, required: false, phase: after}
+  - {id: level_check, name: 수평 확인, description: 수평계를 댄 상태의 사진, required: false, phase: after}
+before_after_pairs:
+  - [site_before, board_installed]
+defect_rubric:
+  - {code: bracket_unsecured, name: 브래킷 고정 불량, description: 앵커·볼트 누락, 헐거움, 벽 재질에 맞지 않는 고정, 브래킷 기울어짐, default_severity: high}
+  - {code: screen_damage, name: 화면 파손·흠집, description: 화면 유리의 금·깨짐·눈에 띄는 긁힘, default_severity: high}
+  - {code: board_tilted, name: 본체 기울어짐, description: 전자칠판이 수평이 맞지 않게 기울어짐, default_severity: medium}
+  - {code: cable_exposed, name: 케이블 정리 불량, description: 케이블이 정리 없이 늘어져 있거나 바닥을 가로질러 걸려 넘어질 위험, default_severity: medium}
+  - {code: wall_damage, name: 벽면 손상, description: 타공 주변 균열·석고 파손·벽지 찢김, default_severity: medium}
+  - {code: debris_left, name: 잔재물/청소 미흡, description: 포장재·스티로폼·타공 분진·공구 방치, default_severity: low}

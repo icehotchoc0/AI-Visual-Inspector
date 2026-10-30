@@ -1,0 +1,20 @@
+# 수전 교체
+id: faucet_replace
+name: 수전 교체
+group: housing
+description: >
+  주방·욕실 수전(수도꼭지) 교체. 기존 수전 철거, 급수 호스·앵글밸브 연결, 수전 고정, 실리콘 마감, 누수 확인 포함.
+shots:
+  - {id: site_before, name: 교체 전 수전, description: 기존 수전과 주변(싱크·세면대)이 보이는 교체 전 사진, required: true, phase: before}
+  - {id: connection_detail, name: 연결부 상세, description: 싱크 하부 급수 호스와 앵글밸브 연결부가 선명하게 보이는 사진, required: true, phase: after}
+  - {id: faucet_installed, name: 교체 완료, description: 설치된 새 수전 전체가 정면에서 보이는 사진, required: true, phase: after}
+  - {id: leak_test, name: 누수 확인, description: 물을 튼 상태에서 수전 베이스와 하부 연결부가 건조한 것을 보여주는 사진, required: true, phase: after}
+before_after_pairs:
+  - [site_before, faucet_installed]
+defect_rubric:
+  - {code: leak_visible, name: 누수, description: 연결부·수전 베이스·싱크 하부의 물방울·물자국, default_severity: high}
+  - {code: joint_misaligned, name: 연결부 체결 불량, description: 호스가 비스듬히 체결되었거나 너트가 덜 조여짐, 테프론·실란트 과다 노출, default_severity: high}
+  - {code: faucet_tilted, name: 수전 기울어짐, description: 수전 본체가 싱크·세면대와 직각을 이루지 않고 기울어짐 또는 흔들림, default_severity: medium}
+  - {code: sealing_gap, name: 베이스 마감 불량, description: 수전 베이스와 상판 사이 실리콘 마감이 없거나 틈이 보임, default_severity: medium}
+  - {code: surface_damage, name: 싱크·세면대 손상, description: 교체 중 생긴 상판·세면대의 긁힘·파손, default_severity: medium}
+  - {code: debris_left, name: 잔재물/청소 미흡, description: 구 수전·포장재·절단 호스·물기 방치, default_severity: low}

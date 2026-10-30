@@ -115,7 +115,7 @@ def defect(code: str, severity: str = "high", conf: float = 0.9) -> dict:
 # ------------------------------------------------------------ fixtures ----
 @pytest.fixture(scope="session")
 def registry() -> CategoryRegistry:
-    return CategoryRegistry.from_yaml(ROOT / "config" / "categories.yaml")
+    return CategoryRegistry.from_path(ROOT / "config" / "categories")
 
 
 @pytest.fixture

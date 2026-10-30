@@ -1,0 +1,5 @@
+# 그룹 정의: 폴더명 = id. order 가 작은 순으로 화면·API 에 정렬됩니다.
+groups:
+  - {id: appliance, name: 가전, order: 10}
+  - {id: housing, name: 주거 시공, order: 20}
+  - {id: commercial, name: 업무·교육 시설, order: 30}

@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     # disabled (local development only; the app logs a warning).
     api_keys: str = Field(default="", alias="INSPECTOR_API_KEYS")
     db_path: str = Field(default="./backend/data/inspector.db", alias="INSPECTOR_DB_PATH")
-    categories_path: str = Field(default="./config/categories.yaml", alias="INSPECTOR_CATEGORIES_PATH")
+    categories_path: str = Field(default="./config/categories", alias="INSPECTOR_CATEGORIES_PATH")  # 폴더(권장) 또는 단일 YAML
     max_photos_per_job: int = 30
     max_image_bytes: int = 15 * 1024 * 1024
     # Longest side images are resized to before being sent to the VLM.

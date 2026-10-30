@@ -35,7 +35,6 @@ SOURCE_LABEL = {
     "quality_check": "품질 검사", "fraud_check": "부정 검사", "checklist": "체크리스트",
     "vlm": "AI 분석", "anomaly_detector": "이상 탐지", "system": "시스템",
 }
-GROUP_LABEL = {"appliance": "가전", "housing": "주거 시공", "commercial": "업무·교육 시설"}
 
 st.set_page_config(page_title=BRAND, page_icon=":material/photo_camera:", layout="wide")
 st.title(BRAND)
@@ -86,12 +85,15 @@ with tab_run:
         st.stop()
 
     cat_by_id = {c["id"]: c for c in categories}
+    # 그룹 → 작업 종류 2단계 선택. 그룹 순서는 API(_groups.yaml order)를 따름.
+    group_names: dict[str, str] = {}
+    for c in categories:
+        group_names.setdefault(c["group"], c.get("group_name") or c["group"])
     col_a, col_b = st.columns([1, 2])
     with col_a:
-        cat_id = st.selectbox(
-            "작업 종류", list(cat_by_id),
-            format_func=lambda i: f"[{GROUP_LABEL.get(cat_by_id[i]['group'], cat_by_id[i]['group'])}] {cat_by_id[i]['name']}",
-        )
+        group_id = st.selectbox("작업 그룹", list(group_names), format_func=lambda g: f"{group_names[g]} ({sum(1 for c in categories if c['group'] == g)})")
+        in_group = [c["id"] for c in categories if c["group"] == group_id]
+        cat_id = st.selectbox("작업 종류", in_group, format_func=lambda i: cat_by_id[i]["name"])
         job_id = st.text_input("작업 번호", value="demo-001")
         technician = st.text_input("기사 ID", value="")
         notes = st.text_area("기사 메모 (선택)", height=80)

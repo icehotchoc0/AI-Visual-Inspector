@@ -1,0 +1,21 @@
+# 전기 시공
+id: electrical
+name: 전기 시공
+group: housing
+description: >
+  주거 공간 전기 시공. 콘센트·스위치·조명 교체, 배선, 분전반 작업, 마감 포함.
+shots:
+  - {id: site_before, name: 시공 전 현장, description: 교체·시공할 전기 설비(콘센트·스위치·조명·분전반)의 시공 전 사진, required: true, phase: before}
+  - {id: wiring_detail, name: 결선 상세, description: 커버를 닫기 전 결선 상태(단자·접속부)가 선명하게 보이는 사진, required: true, phase: after}
+  - {id: finished_fixture, name: 마감 완료, description: 커버·플레이트가 닫히고 마감된 설비 사진, required: true, phase: after}
+  - {id: power_test, name: 통전 확인, description: 조명 점등 또는 테스터기 측정값이 보이는 사진, required: false, phase: after}
+  - {id: breaker_panel, name: 분전반, description: 작업 관련 차단기와 라벨이 보이는 분전반 사진, required: false, phase: any}
+before_after_pairs:
+  - [site_before, finished_fixture]
+defect_rubric:
+  - {code: exposed_wiring, name: 전선 노출, description: 마감 후에도 피복이 벗겨진 전선이나 결선부가 외부로 노출됨, default_severity: high}
+  - {code: loose_terminal, name: 단자 체결 불량, description: 단자에 전선이 헐겁게 물려 있거나 심선이 과도하게 노출됨, default_severity: high}
+  - {code: scorch_mark, name: 탄 흔적/변색, description: 단자·콘센트·전선 주변의 그을음이나 열 변색, default_severity: high}
+  - {code: plate_misaligned, name: 플레이트 마감 불량, description: 스위치/콘센트 플레이트가 기울었거나 벽과 틈이 벌어짐, default_severity: low}
+  - {code: wall_damage, name: 벽면 손상, description: 시공 중 생긴 벽지 찢김·석고 파손, default_severity: medium}
+  - {code: debris_left, name: 잔재물/청소 미흡, description: 전선 조각·포장재·공구 방치, default_severity: low}

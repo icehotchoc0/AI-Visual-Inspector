@@ -48,7 +48,7 @@ backend/data/datasets/eval/<category_id>/
 ```
 
 규칙
-- `shot_type` 은 `config/categories.yaml` 의 해당 카테고리 `shots[].id` 또는 `other`.
+- `shot_type` 은 `config/categories/<그룹>/<카테고리>.yaml` 의 `shots[].id` 또는 `other`.
 - `defects[].code` 는 `defect_rubric[].code` 또는 `other`. 하자가 없으면 빈 배열.
 - `quality_issue` 는 `blurry | too_dark | overexposed | low_resolution` 중 하나(없으면 생략).
 - `fraud` 는 작업 단위 부정 라벨: `duplicate_in_job | reused_from_other_job | gps_spread | ...`.
@@ -76,7 +76,7 @@ backend/data/datasets/<model_key>/
 ```
 
 규칙
-- `model_key` 는 `categories.yaml` → `anomaly.model_key` 와 동일한 문자열 (예: `aircon_outdoor_unit`).
+- `model_key` 는 카테고리 파일의 `anomaly.model_key` 와 동일한 문자열 (예: `aircon_outdoor_unit`).
 - `test/<폴더명>` 은 하자 코드와 같은 이름을 권장(리포트 가독성).
 - JPG/PNG, 최소 640px. 촬영 거리·각도가 흔들리면 성능이 급락하므로 기사 앱의 촬영 가이드(프레임 오버레이)와 함께 운용.
 
@@ -88,7 +88,7 @@ python training/train_folder.py --model-key aircon_outdoor_unit --backend patchc
 ```
 
 ```yaml
-# config/categories.yaml - 해당 카테고리에 추가
+# config/categories/<그룹>/<카테고리>.yaml - 해당 파일에 추가
 anomaly:
   enabled: true
   model_key: aircon_outdoor_unit

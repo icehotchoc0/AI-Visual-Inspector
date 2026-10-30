@@ -1,11 +1,17 @@
 """
-Category registry: loads config/categories.yaml into typed objects.
+Category registry: loads the category config into typed objects.
 
 Categories (what work is being inspected, which photos are required, which
 visual defects to look for) live in YAML, not in code, so the service can
-cover new work types - appliance install/repair and housing construction
-alike - without a deploy. The same objects feed the VLM prompts, the
-checklist check, and the /v1/categories endpoint.
+cover new work types without a deploy. The same objects feed the VLM
+prompts, the checklist check, and the /v1/categories endpoint.
+
+Two layouts are supported:
+  * a directory  config/categories/<group>/<id>.yaml  (one file per work
+    type) plus _defaults.yaml (shared thresholds) and _groups.yaml (group
+    names + order) - the layout used by this repo;
+  * a single YAML file with `defaults:` and `categories:` (legacy / tests).
+A category file with `enabled: false` is validated but not registered.
 """
 from __future__ import annotations
 
@@ -61,10 +67,18 @@ class AnomalyPlugin(BaseModel):
     shot_types: list[str] = Field(default_factory=list)
 
 
+class Group(BaseModel):
+    id: str
+    name: str
+    order: int = 100
+
+
 class Category(BaseModel):
     id: str
     name: str
     group: str = "other"
+    enabled: bool = True
+    order: int = 100  # 그룹 안에서의 표시 순서 (작을수록 앞). 같으면 이름순
     description: str = ""
     shots: list[ShotSpec] = Field(default_factory=list)
     before_after_pairs: list[tuple[str, str]] = Field(default_factory=list)
@@ -109,25 +123,67 @@ class Category(BaseModel):
 
 
 class CategoryRegistry:
-    def __init__(self, categories: list[Category]):
+    def __init__(self, categories: list[Category], groups: list[Group] | None = None):
+        groups = groups or []
+        known = {g.id: g for g in groups}
+        for c in categories:
+            known.setdefault(c.group, Group(id=c.group, name=c.group))
+        self._groups = sorted(known.values(), key=lambda g: (g.order, g.id))
+        order = {g.id: i for i, g in enumerate(self._groups)}
+        categories = sorted(categories, key=lambda c: (order.get(c.group, 999), c.order, c.name))
         self._by_id = {c.id: c for c in categories}
         if len(self._by_id) != len(categories):
-            raise ValueError("duplicate category ids in categories.yaml")
+            raise ValueError("duplicate category ids")
+
+    # -- loading -----------------------------------------------------------
+    @classmethod
+    def from_path(cls, path: str | Path) -> "CategoryRegistry":
+        path = Path(path)
+        return cls.from_dir(path) if path.is_dir() else cls.from_yaml(path)
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "CategoryRegistry":
         raw = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
         defaults = raw.get("defaults", {}) or {}
-        categories = []
-        for entry in raw.get("categories", []) or []:
-            merged = dict(entry)
-            # Per-category blocks override the shared defaults field by field.
-            for key in ("quality", "fraud", "verdict"):
-                merged[key] = {**(defaults.get(key) or {}), **(entry.get(key) or {})}
-            merged["before_after_pairs"] = [tuple(p) for p in entry.get("before_after_pairs", []) or []]
-            categories.append(Category(**merged))
-        return cls(categories)
+        groups = [Group(**g) for g in (raw.get("groups") or [])]
+        categories = [cls._build(entry, defaults, source=str(path)) for entry in raw.get("categories", []) or []]
+        return cls([c for c in categories if c.enabled], groups)
 
+    @classmethod
+    def from_dir(cls, path: str | Path) -> "CategoryRegistry":
+        root = Path(path)
+        defaults_file = root / "_defaults.yaml"
+        defaults = ((yaml.safe_load(defaults_file.read_text(encoding="utf-8")) or {}).get("defaults") or {}) if defaults_file.exists() else {}
+        groups_file = root / "_groups.yaml"
+        groups = [Group(**g) for g in ((yaml.safe_load(groups_file.read_text(encoding="utf-8")) or {}).get("groups") or [])] if groups_file.exists() else []
+        categories: list[Category] = []
+        for file in sorted(root.glob("*/*.yaml")):
+            if file.name.startswith("_"):
+                continue
+            raw = yaml.safe_load(file.read_text(encoding="utf-8")) or {}
+            entries = raw.get("categories") if isinstance(raw, dict) and "categories" in raw else [raw]
+            for entry in entries:
+                cat = cls._build(entry, defaults, source=str(file))
+                if cat.group != file.parent.name:
+                    raise ValueError(f"{file}: group '{cat.group}' does not match folder '{file.parent.name}'")
+                if cat.id != file.stem and len(entries) == 1:
+                    raise ValueError(f"{file}: id '{cat.id}' does not match file name")
+                if cat.enabled:
+                    categories.append(cat)
+        return cls(categories, groups)
+
+    @staticmethod
+    def _build(entry: dict, defaults: dict, source: str = "") -> Category:
+        merged = dict(entry)
+        for key in ("quality", "fraud", "verdict"):
+            merged[key] = {**(defaults.get(key) or {}), **(entry.get(key) or {})}
+        merged["before_after_pairs"] = [tuple(p) for p in entry.get("before_after_pairs", []) or []]
+        try:
+            return Category(**merged)
+        except Exception as exc:  # noqa: BLE001 - re-raise with the file name for operators
+            raise ValueError(f"invalid category in {source}: {exc}") from exc
+
+    # -- lookup ------------------------------------------------------------
     def get(self, category_id: str) -> Category:
         try:
             return self._by_id[category_id]
@@ -137,14 +193,21 @@ class CategoryRegistry:
     def __contains__(self, category_id: str) -> bool:
         return category_id in self._by_id
 
-    def all(self) -> list[Category]:
-        return list(self._by_id.values())
+    def all(self, group: str | None = None) -> list[Category]:
+        return [c for c in self._by_id.values() if group is None or c.group == group]
 
     @property
     def ids(self) -> list[str]:
         return list(self._by_id)
 
+    @property
+    def groups(self) -> list[Group]:
+        return list(self._groups)
+
+    def group_name(self, group_id: str) -> str:
+        return next((g.name for g in self._groups if g.id == group_id), group_id)
+
 
 @lru_cache(maxsize=4)
 def load_registry(path: str) -> CategoryRegistry:
-    return CategoryRegistry.from_yaml(path)
+    return CategoryRegistry.from_path(path)

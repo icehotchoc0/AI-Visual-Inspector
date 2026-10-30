@@ -52,7 +52,7 @@ JSON 스키마(공급자 측 강제 + 라우터 재검증)를 통과해야 하�
 
 ## 3. 카테고리 설정이 흐르는 곳
 
-`config/categories.yaml` 의 한 카테고리는 다음에 동시에 쓰입니다.
+`config/categories/<그룹>/<id>.yaml` 의 한 카테고리는 다음에 동시에 쓰입니다 (`_defaults.yaml` 임계값과 필드 단위 머지, `enabled: false` 면 미로드).
 
 - `shots[]` → VLM 컷 분류 enum, 체크리스트 필수 컷, `/v1/categories`, 대시보드 선택지
 - `defect_rubric[]` → VLM 하자 코드 enum + 설명 프롬프트, 기본 심각도, 응답 `finding.code`
@@ -62,7 +62,7 @@ JSON 스키마(공급자 측 강제 + 라우터 재검증)를 통과해야 하�
 
 ## 4. 확장 포인트
 
-- **새 카테고리/하자 코드**: YAML 만 수정. 테스트 `test_categories.py` 가 참조 무결성을 검사합니다.
+- **새 카테고리/하자 코드**: 그룹 폴더에 YAML 파일 하나 추가. 새 그룹은 `_groups.yaml` 에 이름·순서를 등록. 테스트 `test_categories.py` 가 참조 무결성과 폴더·파일명 일치를 검사합니다.
 - **새 VLM 공급자**: `VLMProvider` 프로토콜(`complete_json`) 구현 후 `router.build_router` 에 이름을 추가.
 - **다른 저장소(Postgres 등)**: `HashHistory.find_similar` + `save/get/list` 를 구현. 파이프라인은 인터페이스만 봅니다.
 - **비동기 처리**: 현재는 요청 안에서 동기 처리(사진당 수 초). 대량 배치는 큐(예: Celery/SQS)에 `pipeline.run` 을 감싸고

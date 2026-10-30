@@ -62,7 +62,7 @@ docker compose build --build-arg ANOMALY=1 backend   # 이상 탐지 플러그�
 
 ## 5. 카테고리 추가/수정
 
-`config/categories.yaml` 을 편집하면 재시작 후 바로 반영됩니다. 항목 설명은 파일 상단 주석 참고.
+`config/categories/<그룹>/<id>.yaml` 파일을 추가·편집하면 재시작 후 바로 반영됩니다. 필드 설명은 `_defaults.yaml` 상단 주석, 그룹은 `_groups.yaml` 참고. 당장 취급하지 않는 작업 종류는 파일에 `enabled: false` 한 줄을 넣으면 됩니다.
 변경 뒤 `pytest tests/test_categories.py` 로 참조 무결성(전후 쌍·이상 탐지 컷 id)을 확인하세요.
 
 ## 6. 평가 세트로 정확도 측정 (권장)
@@ -86,7 +86,7 @@ pip install -r requirements-anomaly.txt   # CUDA torch 는 먼저 설치 (아래
 python training/train_folder.py --model-key aircon_outdoor_unit --backend patchcore
 ```
 
-그리고 `categories.yaml` 해당 카테고리에 `anomaly: {enabled: true, model_key: aircon_outdoor_unit, shot_types: [outdoor_unit_after]}`.
+그리고 해당 카테고리 파일(예: `config/categories/appliance/aircon_install.yaml`)에 `anomaly: {enabled: true, model_key: aircon_outdoor_unit, shot_types: [outdoor_unit_after]}`.
 
 CUDA 빌드 torch 는 PyPI 기본 휠이 아니므로 `pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128`
 을 **먼저** 실행한 뒤 `requirements-anomaly.txt` 를 설치하세요(`torch.cuda.is_available()` 로 확인).

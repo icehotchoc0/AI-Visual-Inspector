@@ -1,0 +1,24 @@
+# 식기세척기 설치
+id: dishwasher_install
+name: 식기세척기 설치
+group: appliance
+description: >
+  빌트인·프리스탠딩 식기세척기 신규 설치. 급수·배수 호스 연결, 본체 삽입·고정, 수평 조정,
+  전면 패널·도어 정렬, 누수 테스트, 전원 연결 포함.
+shots:
+  - {id: site_before, name: 설치 전 공간, description: 식기세척기를 넣을 싱크대 공간 또는 기존 기기가 보이는 설치 전 사진, required: true, phase: before}
+  - {id: water_drain_connection, name: 급수·배수 연결부, description: 급수 호스·배수 호스가 밸브와 배수관에 연결된 부위 사진, required: true, phase: after}
+  - {id: unit_installed, name: 설치 완료, description: 삽입·고정되고 전면 패널·도어가 정렬된 식기세척기 정면 전체 사진, required: true, phase: after}
+  - {id: leak_test, name: 누수 테스트, description: 시운전 후 호스 연결부와 싱크 하부 바닥이 건조한 것을 보여주는 사진, required: true, phase: after}
+  - {id: power_connection, name: 전원 연결, description: 전원 플러그·콘센트 연결부 사진, required: false, phase: after}
+  - {id: operation_test, name: 시운전, description: 전원이 켜져 디스플레이가 동작하는 사진, required: false, phase: after}
+before_after_pairs:
+  - [site_before, unit_installed]
+defect_rubric:
+  - {code: leak_visible, name: 누수, description: 호스 연결부·싱크 하부·기기 바닥의 물 고임이나 물자국, default_severity: high}
+  - {code: hose_loose, name: 호스 체결 불량, description: 급수·배수 호스가 느슨하거나 클램프가 누락됨, default_severity: high}
+  - {code: exposed_wiring, name: 전선 노출, description: 마감되지 않은 전선·접속부 노출, default_severity: high}
+  - {code: door_misaligned, name: 도어·패널 정렬 불량, description: 도어 또는 빌트인 전면 패널이 주변 가구와 단차·기울기가 있음, default_severity: medium}
+  - {code: panel_gap, name: 설치 틈, description: 본체와 싱크대 사이에 눈에 띄는 틈이 있거나 고정 브래킷이 없음, default_severity: medium}
+  - {code: cabinet_damage, name: 가구 손상, description: 설치 중 생긴 싱크대 몸통·문짝·상판의 긁힘·파손, default_severity: medium}
+  - {code: debris_left, name: 잔재물/청소 미흡, description: 포장재·스티로폼·공구·절단 호스 방치, default_severity: low}
