@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import base64
 import io
+import os
 import sys
 from pathlib import Path
 
@@ -18,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from backend.categories import CategoryRegistry  # noqa: E402
 from backend.config import Settings  # noqa: E402
 from backend.pipeline import InspectionPipeline  # noqa: E402
-from backend.store import SQLiteStore  # noqa: E402
+from backend.store import SQLiteStore, Store, metadata  # noqa: E402
 from backend.vlm.base import VLMError, VLMRequest, VLMResponse  # noqa: E402
 from backend.vlm.router import VLMRouter  # noqa: E402
 
@@ -131,9 +132,21 @@ def test_settings(tmp_path) -> Settings:
     )
 
 
+def make_store(tmp_path, name: str = "store") -> Store:
+    """SQLite file per test by default; set INSPECTOR_TEST_DATABASE_URL to run the
+    same suite against PostgreSQL (tables are dropped and recreated per store)."""
+    url = os.environ.get("INSPECTOR_TEST_DATABASE_URL")
+    if url:
+        s = Store(url)
+        metadata.drop_all(s.engine)
+        metadata.create_all(s.engine)
+        return s
+    return SQLiteStore(tmp_path / f"{name}.db")
+
+
 @pytest.fixture
-def store(tmp_path) -> SQLiteStore:
-    s = SQLiteStore(tmp_path / "store.db")
+def store(tmp_path) -> Store:
+    s = make_store(tmp_path, "store")
     yield s
     s.close()
 

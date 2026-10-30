@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt requirements-anomaly.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt "psycopg[binary]>=3.1"
 # Optional: anomaly-detection plugin (large; CPU torch). Build with
 #   docker compose build --build-arg ANOMALY=1
 ARG ANOMALY=0
@@ -17,6 +17,7 @@ RUN if [ "$ANOMALY" = "1" ]; then pip install --no-cache-dir -r requirements-ano
 COPY backend/ backend/
 COPY config/ config/
 COPY training/ training/
+COPY scripts/ scripts/
 
 EXPOSE 8000
 CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000"]

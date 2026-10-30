@@ -8,7 +8,7 @@ Tables
   queue_jobs    async inspection queue (status, idempotency, callback)
 
 Hash search: on PostgreSQL the hamming distance is computed in SQL with
-bit_count(phash_int # :h) (PG14+); on SQLite it is a Python scan, fine up
+bit_count((phash_int # :h)::bit(64)) (PG14+); on SQLite it is a Python scan, fine up
 to ~10^5 rows. Both go through the same HashHistory interface.
 """
 from __future__ import annotations
@@ -139,7 +139,7 @@ class Store(HashHistory):
         with self.engine.connect() as conn:
             if self.is_postgres:
                 rows = conn.execute(
-                    text("SELECT photo_id, job_id, inspection_id, bit_count(phash_int # :h) AS d FROM photo_hashes WHERE job_id != :j AND bit_count(phash_int # :h) <= :d"),
+                    text("SELECT photo_id, job_id, inspection_id, bit_count((phash_int # :h)::bit(64)) AS d FROM photo_hashes WHERE job_id != :j AND bit_count((phash_int # :h)::bit(64)) <= :d"),
                     {"h": h_int, "j": exclude_job_id, "d": max_distance},
                 ).fetchall()
                 return [HistoricalMatch(photo_id=r[0], job_id=r[1], inspection_id=r[2], distance=int(r[3])) for r in rows]

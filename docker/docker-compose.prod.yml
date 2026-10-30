@@ -1,0 +1,99 @@
+# 상용 구성: PostgreSQL + API(복수 가능) + 큐 워커 + 운영자 대시보드.
+#   cd docker && docker compose -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.prod.yml up -d --scale api=2 --scale worker=3
+# 비밀값은 ../.env 에서 읽습니다 (INSPECTOR_API_KEYS, ANTHROPIC_API_KEY, INSPECTOR_WEBHOOK_SECRET, POSTGRES_PASSWORD).
+# HTTPS 종료·/metrics 접근 제한·본문 크기 제한은 앞단 리버스 프록시에서 설정하세요 (docs/OPERATIONS.md).
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: inspector
+      POSTGRES_USER: inspector
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inspector -d inspector"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    env_file: ../.env
+    environment:
+      INSPECTOR_DATABASE_URL: postgresql+psycopg://inspector:${POSTGRES_PASSWORD}@db:5432/inspector
+      INSPECTOR_QUEUE_WORKERS: "0"              # API 레플리카는 큐를 처리하지 않음
+      INSPECTOR_PHOTO_STORE_DIR: /data/photos
+      INSPECTOR_OLLAMA_HOST: http://host.docker.internal:11434
+      INSPECTOR_LOG_JSON: "true"
+    volumes:
+      - photos:/data/photos
+      - ../config:/app/config:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    command: ["uvicorn", "backend.app:app", "--host", "127.0.0.1", "--port", "8001"]   # 포트 미노출, 큐 워커만 수행
+    env_file: ../.env
+    environment:
+      INSPECTOR_DATABASE_URL: postgresql+psycopg://inspector:${POSTGRES_PASSWORD}@db:5432/inspector
+      INSPECTOR_QUEUE_WORKERS: "4"
+      INSPECTOR_PHOTO_STORE_DIR: /data/photos
+      INSPECTOR_OLLAMA_HOST: http://host.docker.internal:11434
+      INSPECTOR_LOG_JSON: "true"
+    volumes:
+      - photos:/data/photos
+      - ../config:/app/config:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dashboard
+    environment:
+      INSPECTOR_API_URL: http://api:8000
+      INSPECTOR_API_KEY: ${INSPECTOR_DASHBOARD_API_KEY:?set INSPECTOR_DASHBOARD_API_KEY in .env (one of INSPECTOR_API_KEYS)}
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  purge:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    command: ["sh", "-c", "while true; do python scripts/purge_photos.py; sleep 86400; done"]
+    env_file: ../.env
+    environment:
+      INSPECTOR_PHOTO_STORE_DIR: /data/photos
+    volumes:
+      - photos:/data/photos
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  photos:

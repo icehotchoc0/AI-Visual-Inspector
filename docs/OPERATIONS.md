@@ -11,7 +11,8 @@
 | 민감 데이터·망분리 | 위 구성 + Ollama 서버 | `INSPECTOR_VLM_PROVIDERS=ollama` 또는 카테고리별 `privacy.local_only: true` |
 
 - SQLite는 **인스턴스 1개**에서만 안전합니다. 두 번째 인스턴스를 띄우기 전에 PostgreSQL로 옮기세요 (`pip install psycopg[binary]`). 스키마는 기동 시 자동 생성됩니다.
-- 워커 프로세스는 API와 같은 이미지로 `INSPECTOR_QUEUE_WORKERS=4 python -c "import backend.app"` 대신 `uvicorn`을 띄우되 외부 포트를 노출하지 않는 방식이 가장 단순합니다. 큐 클레임은 DB 트랜잭션이라 프로세스 수와 무관하게 중복 실행이 없습니다.
+- 워커 프로세스는 API와 같은 이미지로 `uvicorn`을 띄우되 외부 포트를 노출하지 않고 `INSPECTOR_QUEUE_WORKERS>0`만 주는 방식이 가장 단순합니다. 큐 클레임은 DB 트랜잭션이라 프로세스 수와 무관하게 중복 실행이 없습니다.
+- 참고 구성: `docker/docker-compose.prod.yml` (PostgreSQL 16 + api + worker + dashboard + 사진 정리). `--scale api=2 --scale worker=3` 로 늘립니다. PostgreSQL 경로는 CI(`test-postgres` 잡)와 이 저장소 개발 중 PostgreSQL 16 실서버에서 테스트 전체를 통과했습니다.
 - 리버스 프록시(nginx/ALB)에서 HTTPS 종료, 요청 본문 크기(사진 30장 × 15 MB 고려), `/metrics` 접근 제한을 설정합니다.
 
 ## 2. 필수 환경변수 점검표

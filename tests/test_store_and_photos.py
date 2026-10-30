@@ -7,8 +7,7 @@ import pytest
 
 from backend.photostore import PhotoStore
 from backend.schemas import InspectionOptions, InspectionRequest, JobContext, PhotoInput
-from backend.store import Store
-from tests.conftest import FakeVLM, make_photo, make_pipeline, to_b64, to_bytes
+from tests.conftest import make_store, FakeVLM, make_photo, make_pipeline, to_b64, to_bytes
 
 
 def _run(pipe, job_id, tech="T-1", seed=10, cat="plumbing", run_vlm=False):
@@ -22,7 +21,7 @@ def _run(pipe, job_id, tech="T-1", seed=10, cat="plumbing", run_vlm=False):
 
 
 def test_store_roundtrip_review_and_lists(registry, test_settings, tmp_path):
-    store = Store(f"sqlite:///{tmp_path}/s.db")
+    store = make_store(tmp_path, "s")
     pipe = make_pipeline(registry, test_settings, None, store)
     res = _run(pipe, "J-1")
     assert store.get(res.inspection_id).inspection_id == res.inspection_id
@@ -40,7 +39,7 @@ def test_store_roundtrip_review_and_lists(registry, test_settings, tmp_path):
 
 
 def test_technician_stats_and_filters(registry, test_settings, tmp_path):
-    store = Store(f"sqlite:///{tmp_path}/t.db")
+    store = make_store(tmp_path, "t")
     pipe = make_pipeline(registry, test_settings, None, store)
     _run(pipe, "J-a", tech="T-1", seed=100)
     _run(pipe, "J-b", tech="T-1", seed=200)
@@ -49,12 +48,12 @@ def test_technician_stats_and_filters(registry, test_settings, tmp_path):
     assert stats["T-1"]["total"] == 2 and stats["T-2"]["total"] == 1
     assert 0 <= stats["T-1"]["pass_rate"] <= 1
     assert [i.job_id for i in store.list(technician_id="T-2")] == ["J-c"]
-    assert store.stats()["backend"] == "sqlite" and store.stats()["review_pending"] >= 0
+    assert store.stats()["backend"] in ("sqlite", "postgresql") and store.stats()["review_pending"] >= 0
     store.close()
 
 
 def test_hash_history_cross_job(registry, test_settings, tmp_path):
-    store = Store(f"sqlite:///{tmp_path}/h.db")
+    store = make_store(tmp_path, "h")
     pipe = make_pipeline(registry, test_settings, None, store)
     first = _run(pipe, "J-x", seed=500)
     phash = first.photos[0].meta.perceptual_hash
@@ -65,7 +64,7 @@ def test_hash_history_cross_job(registry, test_settings, tmp_path):
 
 
 def test_queue_lifecycle_and_idempotency(tmp_path):
-    store = Store(f"sqlite:///{tmp_path}/q.db")
+    store = make_store(tmp_path, "q")
     k1, created = store.enqueue('{"a":1}', "https://cb.example/hook", "idem-1")
     assert created
     k2, created2 = store.enqueue('{"a":1}', None, "idem-1")
@@ -90,7 +89,7 @@ def test_requeue_stale_running(tmp_path):
 
     from backend.store import queue_jobs
 
-    store = Store(f"sqlite:///{tmp_path}/r.db")
+    store = make_store(tmp_path, "r")
     k, _ = store.enqueue("{}", None, None)
     store.claim_next()
     with store.engine.begin() as conn:
@@ -116,7 +115,7 @@ def test_photo_store_policy_save_find_purge(tmp_path):
 
 
 def test_pipeline_retains_photos_for_review_only(registry, test_settings, tmp_path):
-    store = Store(f"sqlite:///{tmp_path}/pr.db")
+    store = make_store(tmp_path, "pr")
     ps = PhotoStore(tmp_path / "ph", policy="review_only")
     pipe = make_pipeline(registry, test_settings, FakeVLM(fail_with="down"), store)  # VLM down -> REVIEW
     pipe.photo_store = ps

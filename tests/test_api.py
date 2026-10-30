@@ -4,13 +4,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 import backend.app as app_module
-from backend.store import SQLiteStore
-from tests.conftest import FakeVLM, make_photo, make_pipeline, to_b64, to_bytes
+from tests.conftest import make_store, FakeVLM, make_photo, make_pipeline, to_b64, to_bytes
 
 
 @pytest.fixture
 def client(registry, test_settings, tmp_path, monkeypatch):
-    store = SQLiteStore(tmp_path / "api.db")
+    store = make_store(tmp_path, "api")
     pipe = make_pipeline(registry, test_settings, FakeVLM(), store)
     monkeypatch.setattr(app_module, "get_pipeline", lambda: pipe)
     monkeypatch.setattr(app_module, "get_store", lambda: store)

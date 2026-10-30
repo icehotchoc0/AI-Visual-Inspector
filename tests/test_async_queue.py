@@ -6,13 +6,12 @@ from fastapi.testclient import TestClient
 
 import backend.app as app_module
 from backend.queue import QueueWorker, verify_signature
-from backend.store import Store
-from tests.conftest import FakeVLM, make_photo, make_pipeline, to_b64, to_bytes
+from tests.conftest import make_store, FakeVLM, make_photo, make_pipeline, to_b64, to_bytes
 
 
 @pytest.fixture
 def env(registry, test_settings, tmp_path, monkeypatch):
-    store = Store(f"sqlite:///{tmp_path}/q.db")
+    store = make_store(tmp_path, "q")
     pipe = make_pipeline(registry, test_settings, FakeVLM(), store)
     monkeypatch.setattr(app_module, "get_pipeline", lambda: pipe)
     monkeypatch.setattr(app_module, "get_store", lambda: store)
@@ -97,7 +96,7 @@ def test_worker_threads_process_queue(registry, test_settings, tmp_path):
 
     from backend.schemas import InspectionOptions, InspectionRequest, JobContext, PhotoInput
 
-    store = Store(f"sqlite:///{tmp_path}/w.db")
+    store = make_store(tmp_path, "w")
     pipe = make_pipeline(registry, test_settings, FakeVLM(), store)
     req = InspectionRequest(job=JobContext(job_id="W-1", category="plumbing"), photos=[PhotoInput(photo_id="p0", image_base64=to_b64(make_photo(9)), declared_shot_type="site_before")], options=InspectionOptions(run_vlm=False))
     key, _ = store.enqueue(req.model_dump_json(), None, None)

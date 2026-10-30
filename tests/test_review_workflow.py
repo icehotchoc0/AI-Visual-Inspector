@@ -6,14 +6,13 @@ from fastapi.testclient import TestClient
 
 import backend.app as app_module
 from backend.photostore import PhotoStore
-from backend.store import Store
-from tests.conftest import FakeVLM, make_photo, make_pipeline, to_b64
+from tests.conftest import make_store, FakeVLM, make_photo, make_pipeline, to_b64
 from training.export_eval_set import export
 
 
 @pytest.fixture
 def env(registry, test_settings, tmp_path, monkeypatch):
-    store = Store(f"sqlite:///{tmp_path}/rv.db")
+    store = make_store(tmp_path, "rv")
     ps = PhotoStore(tmp_path / "photos", policy="review_only")
     pipe = make_pipeline(registry, test_settings, FakeVLM(fail_with="down"), store)  # VLM down -> every job REVIEW
     pipe.photo_store = ps
