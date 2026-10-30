@@ -29,6 +29,7 @@ VERDICT_LABEL = {"PASS": "합격", "REVIEW": "검토 필요", "FAIL": "불합격
 VERDICT_BOX = {"PASS": st.success, "REVIEW": st.warning, "FAIL": st.error}
 # 사진 상태 → (라벨, 색 표식). Streamlit 마크다운 색상 문법 사용.
 STATUS_LABEL = {"OK": "정상", "FLAGGED": "지적", "REJECTED": "반려"}
+code_by_label_review = {"합격": "PASS", "불합격": "FAIL", "검토 필요": "REVIEW"}
 STATUS_MARK = {"OK": ":green[●]", "FLAGGED": ":orange[●]", "REJECTED": ":red[●]"}
 SEV_LABEL = {"high": "심각", "medium": "보통", "low": "경미"}
 SOURCE_LABEL = {
@@ -74,7 +75,7 @@ with st.sidebar:
         st.error(f"검사 서비스에 연결할 수 없습니다: {API_URL}")
         st.stop()
 
-tab_run, tab_history = st.tabs(["검사 실행", "검사 이력"])
+tab_run, tab_review, tab_history, tab_stats = st.tabs(["검사 실행", "검수 큐", "검사 이력", "기사별 통계"])
 
 # ------------------------------------------------------------ 검사 실행 ----
 with tab_run:
@@ -218,6 +219,47 @@ with tab_run:
         )
         st.download_button("결과 JSON 다운로드", json.dumps(result, ensure_ascii=False, indent=2), file_name=f"{result['inspection_id']}.json", mime="application/json")
 
+# ------------------------------------------------------------ 검수 큐 ----
+with tab_review:
+    st.caption("자동 판정이 '검토 필요'인 작업을 사람이 확인하고 최종 판정을 남깁니다. 저장된 판정은 평가 세트의 정답으로 쓰입니다.")
+    reviewer = st.text_input("검수자 이름", value=st.session_state.get("reviewer", ""), key="reviewer_name")
+    st.session_state["reviewer"] = reviewer
+    try:
+        queue = requests.get(f"{API_URL}/v1/reviews/queue", params={"limit": 100}, headers=HEADERS, timeout=10).json()
+    except requests.RequestException as exc:
+        st.error(f"검수 큐를 불러오지 못했습니다: {exc}")
+        queue = []
+    if not queue:
+        st.success("검수 대기 중인 작업이 없습니다.")
+    else:
+        st.write(f"대기 {len(queue)}건")
+        pick = st.selectbox("검수할 작업", [q["inspection_id"] for q in queue], format_func=lambda i: next(f"{q['job_id']} · {q['category']} · {q['created_at'][:16]}" for q in queue if q["inspection_id"] == i))
+        detail = requests.get(f"{API_URL}/v1/inspections/{pick}", headers=HEADERS, timeout=10).json()
+        st.warning(f"**검토 필요** - {detail['summary']}")
+        for reason in detail["verdict_reasons"]:
+            st.write(f"- {reason}")
+        cols = st.columns(min(4, max(1, len(detail["photos"]))))
+        for i, p in enumerate(detail["photos"]):
+            with cols[i % len(cols)]:
+                st.markdown(f"{STATUS_MARK[p['status']]} **{p['photo_id']}** · {p.get('resolved_shot_type') or '미분류'}")
+                if p.get("stored"):
+                    st.image(f"{API_URL}/v1/inspections/{pick}/photos/{p['photo_id']}" if not API_KEY else requests.get(f"{API_URL}/v1/inspections/{pick}/photos/{p['photo_id']}", headers=HEADERS, timeout=10).content, use_container_width=True)
+                else:
+                    st.caption("사진 미보관 (INSPECTOR_PHOTO_STORE_DIR 설정 시 표시)")
+                for f in p["findings"]:
+                    st.caption(f"[{SEV_LABEL.get(f['severity'], f['severity'])}] {f['message']}")
+        c1, c2, c3 = st.columns([1, 1, 2])
+        final = c1.radio("최종 판정", ["합격", "불합격", "검토 필요"], horizontal=False)
+        notes = c3.text_area("검수 메모 (하자 코드는 #코드 형태로 적으면 평가 세트 라벨이 됩니다. 예: #exposed_wiring 확인)", height=100)
+        if c2.button("판정 저장", type="primary", disabled=not reviewer):
+            body = {"verdict": code_by_label_review[final], "reviewer": reviewer, "notes": notes or None}
+            r = requests.post(f"{API_URL}/v1/inspections/{pick}/review", json=body, headers=HEADERS, timeout=10)
+            if r.ok:
+                st.success("저장했습니다. 다음 작업을 선택하세요.")
+                st.rerun()
+            else:
+                st.error(f"저장 실패 ({r.status_code}): {r.text}")
+
 # ------------------------------------------------------------ 검사 이력 ----
 with tab_history:
     f1, f2, f3 = st.columns(3)
@@ -240,7 +282,7 @@ with tab_history:
         rows = []
     if rows:
         st.dataframe(
-            [{"검사 번호": r["inspection_id"], "작업 번호": r["job_id"], "작업 종류": r["category"], "판정": VERDICT_LABEL.get(r["verdict"], r["verdict"]), "사진 수": r["num_photos"], "검사 시각": r["created_at"]} for r in rows],
+            [{"검사 번호": r["inspection_id"], "작업 번호": r["job_id"], "기사": r.get("technician_id") or "", "작업 종류": r["category"], "자동 판정": VERDICT_LABEL.get(r["verdict"], r["verdict"]), "검수 판정": VERDICT_LABEL.get(r.get("review_verdict"), "") if r.get("review_verdict") else "", "사진 수": r["num_photos"], "검사 시각": r["created_at"][:19]} for r in rows],
             use_container_width=True,
         )
         pick = st.selectbox("상세 보기", [r["inspection_id"] for r in rows])
@@ -252,3 +294,20 @@ with tab_history:
                 st.info("'검사 실행' 탭에서 결과를 확인하세요.")
     else:
         st.info("저장된 검사가 없습니다.")
+
+# ------------------------------------------------------------ 기사별 통계 ----
+with tab_stats:
+    days = st.slider("기간 (일)", min_value=7, max_value=180, value=30)
+    try:
+        stats = requests.get(f"{API_URL}/v1/stats/technicians", params={"days": days}, headers=HEADERS, timeout=10).json()
+    except requests.RequestException as exc:
+        st.error(f"통계를 불러오지 못했습니다: {exc}")
+        stats = []
+    if stats:
+        st.dataframe(
+            [{"기사": s_["technician_id"], "검사 수": s_["total"], "합격": s_["PASS"], "검토": s_["REVIEW"], "불합격": s_["FAIL"], "합격률": f"{s_['pass_rate']*100:.0f}%", "불합격률": f"{s_['fail_rate']*100:.0f}%"} for s_ in stats],
+            use_container_width=True,
+        )
+        st.caption("불합격률이 높은 순. 기사 앱이 technician_id 를 보내는 작업만 집계됩니다.")
+    else:
+        st.info("집계할 데이터가 없습니다.")

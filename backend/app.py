@@ -30,7 +30,7 @@ from backend.ratelimit import rate_limited
 from backend.categories import CategoryRegistry, load_registry
 from backend.config import settings
 from backend.pipeline import PIPELINE_VERSION, InspectionPipeline, PipelineError
-from backend.schemas import CategoryInfo, GroupInfo, InspectionListItem, InspectionRequest, InspectionResult, JobContext, PhotoInput, InspectionOptions
+from backend.schemas import CategoryInfo, GroupInfo, InspectionListItem, InspectionRequest, InspectionResult, JobContext, PhotoInput, InspectionOptions, ReviewInfo, ReviewRequest, TechnicianStat
 from backend.photostore import PhotoStore
 from backend.store import Store
 from backend.vlm import build_router
@@ -227,8 +227,39 @@ def list_inspections(
     job_id: Optional[str] = None,
     category: Optional[str] = None,
     verdict: Optional[str] = Query(default=None, pattern="^(PASS|REVIEW|FAIL)$"),
+    technician_id: Optional[str] = None,
+    review_state: Optional[str] = Query(default=None, pattern="^(pending|reviewed)$", description="pending = 검수 대기, reviewed = 검수 완료"),
 ) -> list[InspectionListItem]:
-    return get_store().list(limit=limit, job_id=job_id, category=category, verdict=verdict)
+    return get_store().list(limit=limit, job_id=job_id, category=category, verdict=verdict, technician_id=technician_id, review_state=review_state)
+
+
+@app.get("/v1/reviews/queue", response_model=list[InspectionListItem], dependencies=[Depends(rate_limited)])
+def review_queue(limit: int = Query(default=50, ge=1, le=500), category: Optional[str] = None) -> list[InspectionListItem]:
+    """검수 대기 큐: 자동 판정이 REVIEW 이고 아직 사람이 판정하지 않은 건."""
+    return get_store().list(limit=limit, category=category, verdict="REVIEW", review_state="pending")
+
+
+@app.get("/v1/inspections/{inspection_id}/review", response_model=ReviewInfo, dependencies=[Depends(rate_limited)])
+def get_review(inspection_id: str) -> ReviewInfo:
+    rv = get_store().get_review(inspection_id)
+    if rv is None:
+        raise HTTPException(404, f"inspection '{inspection_id}' not found")
+    return ReviewInfo(inspection_id=inspection_id, auto_verdict=rv["verdict"], **{k: v for k, v in rv.items() if k != "verdict"})
+
+
+@app.post("/v1/inspections/{inspection_id}/review", response_model=ReviewInfo, dependencies=[Depends(rate_limited)])
+def set_review(inspection_id: str, body: ReviewRequest) -> ReviewInfo:
+    """검수자 최종 판정 저장. 자동 판정은 그대로 두고 review_verdict 에 기록되며, 평가 세트의 정답이 됩니다."""
+    store = get_store()
+    if not store.set_review(inspection_id, body.verdict, body.reviewer, body.notes):
+        raise HTTPException(404, f"inspection '{inspection_id}' not found")
+    log.info("review recorded", extra={"event": "review", "inspection_id": inspection_id, "verdict": body.verdict})
+    return get_review(inspection_id)
+
+
+@app.get("/v1/stats/technicians", response_model=list[TechnicianStat], dependencies=[Depends(rate_limited)])
+def technician_stats(days: int = Query(default=30, ge=1, le=365), limit: int = Query(default=200, ge=1, le=1000)) -> list[TechnicianStat]:
+    return [TechnicianStat(**row) for row in get_store().technician_stats(days=days, limit=limit)]
 
 
 @app.get("/v1/inspections/{inspection_id}", response_model=InspectionResult, dependencies=[Depends(rate_limited)])

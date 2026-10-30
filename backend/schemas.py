@@ -155,6 +155,33 @@ class InspectionListItem(BaseModel):
     technician_id: Optional[str] = None
 
 
+class ReviewRequest(BaseModel):
+    verdict: Verdict = Field(description="검수자 최종 판정")
+    reviewer: str = Field(min_length=1, max_length=128)
+    notes: Optional[str] = Field(default=None, max_length=4000)
+
+
+class ReviewInfo(BaseModel):
+    inspection_id: str
+    auto_verdict: Verdict
+    review_verdict: Optional[Verdict] = None
+    review_notes: Optional[str] = None
+    reviewed_by: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
+    photos_stored: bool = False
+    technician_id: Optional[str] = None
+
+
+class TechnicianStat(BaseModel):
+    technician_id: str
+    total: int
+    PASS: int = 0
+    REVIEW: int = 0
+    FAIL: int = 0
+    pass_rate: float
+    fail_rate: float
+
+
 class GroupInfo(BaseModel):
     id: str
     name: str
