@@ -91,6 +91,10 @@ python training/train_folder.py --model-key aircon_outdoor_unit --backend patchc
 CUDA 빌드 torch 는 PyPI 기본 휠이 아니므로 `pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128`
 을 **먼저** 실행한 뒤 `requirements-anomaly.txt` 를 설치하세요(`torch.cuda.is_available()` 로 확인).
 
+## 7.5 상용 배포
+
+복수 인스턴스·PostgreSQL·워커 분리·메트릭·알림·개인정보 설정은 `docs/OPERATIONS.md` 와 `docs/PRIVACY.md` 를 따르세요. 배포 전 `python scripts/loadtest.py --url ... --key ... --no-vlm` 로 처리량을 확인합니다.
+
 ## 8. 문제 해결
 
 | 증상 | 원인/조치 |

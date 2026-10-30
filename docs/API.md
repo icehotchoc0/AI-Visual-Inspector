@@ -125,9 +125,27 @@ multipart/form-data. 서비스 백엔드가 파일을 그대로 중계할 때 �
 | anomaly | anomaly_detector | `anomaly_detected` |
 | info | fraud_check / vlm / system | `no_exif`, `before_after_summary`, `before_after_concern`, `unknown_declared_shot` |
 
-## GET /v1/inspections?limit=&job_id=&category=&verdict=
+### 비동기 모드와 멱등성
 
-`[{inspection_id, job_id, category, verdict, created_at, num_photos}]` 최신순.
+- `POST /v1/inspections?mode=async` (upload 도 동일): 즉시 `202 {job_key, status: "queued"}` 를 돌려주고 워커가 처리합니다. `options.callback_url` 이 있으면 완료 시 그 URL 로 결과를 POST 합니다. 본문은 `{job_key, status, inspection_id, job_id, verdict, summary, result}`, 헤더 `X-Inspector-Signature: sha256=<HMAC-SHA256(body, INSPECTOR_WEBHOOK_SECRET)>`, `X-Inspector-Event: inspection.completed`. 2xx 가 아니면 3회 재시도.
+- `GET /v1/jobs/{job_key}?include_result=true` → `{status: queued|running|done|failed, inspection_id, error, result}`.
+- `Idempotency-Key` 헤더: 같은 키로 재호출하면 비동기는 같은 job 을, 동기는 저장된 결과를 돌려주고 검사를 다시 실행하지 않습니다. 기사 앱 재시도·네트워크 중복 전송에 사용.
+- `options.local_only: true`: 사진을 클라우드 VLM 에 보내지 않고 로컬 공급자만 사용. 로컬 공급자가 없으면 AI 분석 없이 REVIEW.
+
+## GET /v1/inspections?limit=&job_id=&category=&verdict=&technician_id=&review_state=
+
+`[{inspection_id, job_id, category, verdict, created_at, num_photos, review_verdict, technician_id}]` 최신순. `review_state=pending|reviewed`.
+
+## 검수 (사람 판정)
+
+- `GET /v1/reviews/queue?limit=&category=` : 자동 판정 REVIEW 이고 검수 전인 건.
+- `GET /v1/inspections/{id}/review` → `{auto_verdict, review_verdict, review_notes, reviewed_by, reviewed_at, photos_stored, technician_id}`.
+- `POST /v1/inspections/{id}/review` 본문 `{verdict: PASS|REVIEW|FAIL, reviewer, notes}`. 자동 판정은 유지되고 검수 판정이 함께 저장됩니다. notes 의 `#code` 태그는 평가 세트 하자 라벨이 됩니다.
+- `GET /v1/inspections/{id}/photos/{photo_id}` : 보관된 원본 사진 (사진 보관 설정 시, REVIEW/FAIL 건).
+
+## GET /v1/stats/technicians?days=30
+
+`[{technician_id, total, PASS, REVIEW, FAIL, pass_rate, fail_rate}]` 불합격률 높은 순.
 
 ## GET /v1/inspections/{inspection_id}
 
@@ -136,6 +154,10 @@ multipart/form-data. 서비스 백엔드가 파일을 그대로 중계할 때 �
 ## GET /v1/categories
 
 `[{id, name, group, description, shots:[{id,name,description,required,phase}], defect_codes:[{code,name,description,default_severity}], before_after_pairs}]`
+
+## GET /metrics (인증 없음, 프록시에서 접근 제한)
+
+Prometheus 텍스트 형식. 항목은 `docs/OPERATIONS.md` §3.
 
 ## GET /health (인증 없음)
 
@@ -153,6 +175,7 @@ multipart/form-data. 서비스 백엔드가 파일을 그대로 중계할 때 �
 |---|---|
 | 400 | 알 수 없는 카테고리, 디코딩 불가 이미지, 중복 photo_id, 사진 수/크기 초과 (`detail` 에 사유) |
 | 401 | X-API-Key 누락/불일치 |
+| 429 | 호출자당 분당 요청 한도 초과 (`Retry-After` 헤더) |
 | 404 | 검사 ID 없음 |
 | 422 | 요청 스키마 위반 |
 

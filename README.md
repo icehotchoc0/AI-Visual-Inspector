@@ -51,7 +51,7 @@ pip install -r requirements.txt
 cp .env.example .env                                  # ANTHROPIC_API_KEY, INSPECTOR_API_KEYS 설정
 uvicorn backend.app:app --host 0.0.0.0 --port 8000    # API: http://localhost:8000/docs
 streamlit run frontend/dashboard.py                   # 운영자 대시보드(마이스터즈 테마): http://localhost:8501
-pytest tests/                                         # 64 tests, GPU·네트워크 불필요
+pytest tests/                                         # 99 tests, GPU·네트워크 불필요
 ```
 
 최소 호출 예:
@@ -105,6 +105,15 @@ curl -X POST http://localhost:8000/v1/inspections/upload \
 - **Ollama** (`qwen2.5vl:7b`): 완전 로컬 폴백. 같은 JSON 스키마를 `format` 파라미터로 강제합니다.
 - 응답에는 사진별로 어떤 공급자·모델이 분석했는지(`analysis.provider/model`)와 토큰 사용량(`stats`)이 남습니다.
 
+## 상용 운영 기능
+
+- **비동기 처리**: `?mode=async` 로 202 반환, DB 큐 + 워커, 완료 시 HMAC 서명 웹훅, `Idempotency-Key` 로 중복 실행 방지.
+- **검수 워크플로**: 검수 큐 API·대시보드 탭, 검수자 최종 판정 저장, 검수 완료 건을 평가 세트로 내보내기(`training/export_eval_set.py`), 기사별 판정 통계.
+- **저장소**: SQLite(1대) 또는 PostgreSQL(복수 인스턴스), 선택적 사진 보관(REVIEW/FAIL 건, 보존일 자동 파기).
+- **VLM 제어**: 전역 동시 호출 제한, 작업당 토큰 상한, 공급자 회로 차단기, 프롬프트 캐싱, 로컬 전용(개인정보) 정책.
+- **관측·보안**: 요청 ID, JSON 로그, Prometheus `/metrics`, API 키별 속도 제한, CORS 화이트리스트, HEIC 지원.
+- 자세한 내용: [docs/OPERATIONS.md](docs/OPERATIONS.md), 개인정보·법무 체크리스트: [docs/PRIVACY.md](docs/PRIVACY.md).
+
 ## 저장소 구조
 
 ```
@@ -114,7 +123,11 @@ backend/
   verdict.py          규칙 기반 PASS/REVIEW/FAIL (유일한 판정 지점)
   categories.py       config/categories/ 폴더 로더 (그룹·enabled·order) + 검증
   schemas.py          API/도메인 모델 (Finding, PhotoResult, InspectionResult ...)
-  store.py            SQLite (검사 이력, 사진 해시 인덱스)
+  store.py            SQLAlchemy (SQLite/PostgreSQL): 검사 이력, 검수 판정, 사진 해시, 비동기 큐
+  photostore.py       선택적 사진 보관·보존일 파기
+  queue.py            비동기 워커, 서명 웹훅
+  observability.py    요청 ID, JSON 로그, Prometheus 메트릭
+  ratelimit.py        API 키별 토큰 버킷
   auth.py             X-API-Key
   checks/quality.py   블러·노출·해상도
   checks/fraud.py     dHash 중복/재사용, EXIF 시각·GPS·편집 소프트웨어
@@ -130,7 +143,9 @@ training/
   train_folder.py        우리 데이터로 이상 탐지 플러그인 학습 (docs/DATA_SPEC.md 규격)
   evaluate_eval_set.py   라벨된 평가 세트로 판정·컷·하자 정확도 측정
   train_patchcore.py / train_efficientad.py / evaluate.py   (레거시 MVTec 벤치마크)
-tests/                  64 tests - FakeVLM 으로 파이프라인·API 전체를 오프라인 검증
+tests/                  99 tests - FakeVLM 으로 파이프라인·API·큐·검수 전체를 오프라인 검증
+scripts/                purge_photos.py (보존 정리), loadtest.py (부하 테스트)
+.github/workflows/ci.yml  푸시마다 설정 검증·테스트·기동 확인
 docs/API.md · ARCHITECTURE.md · DATA_SPEC.md
 docker/                 backend + dashboard compose
 ```
@@ -145,10 +160,10 @@ docker/                 backend + dashboard compose
 
 - VLM 하자 검출의 실제 정밀도/재현율은 **우리 사진으로 측정하기 전까지 알 수 없습니다.** 그래서 기본 정책은
   보수적입니다: 확신도 0.6 미만은 참고만, 심각(high)만 FAIL, 보통(medium)은 REVIEW.
-- 교차 작업 재사용 검사는 SQLite 선형 스캔입니다(사진 10만 장까지 충분). 그 이상이면 Postgres + 해시 인덱스로 옮기되
-  `HashHistory` 인터페이스는 그대로입니다.
+- 교차 작업 재사용 검사는 SQLite 에서는 선형 스캔(사진 10만 장까지 충분), PostgreSQL 에서는 `bit_count` SQL 로 동작합니다.
 - EXIF 는 메신저 전송 시 흔히 제거됩니다. 기사 앱이 원본을 올리도록 해야 시각·GPS 검증이 의미 있습니다.
 - 전/후 비교는 쌍당 첫 사진끼리만 비교합니다(비용 제어). 필요하면 `pipeline.py::_compare` 호출을 확장하세요.
+- 개인정보(국외 이전·위치정보) 검토는 기술적 선택지만 준비되어 있습니다. 결론은 법무 검토가 필요합니다 (`docs/PRIVACY.md`).
 
 ## 원본 프로젝트
 
