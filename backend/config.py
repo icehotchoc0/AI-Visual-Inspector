@@ -27,6 +27,14 @@ class Settings(BaseSettings):
     categories_path: str = Field(default="./config/categories", alias="INSPECTOR_CATEGORIES_PATH")  # 폴더(권장) 또는 단일 YAML
     max_photos_per_job: int = 30
     max_image_bytes: int = 15 * 1024 * 1024
+    # Comma-separated allowed browser origins for CORS. Empty = no browser
+    # cross-origin access (service-to-service only). "*" = allow all (dev).
+    cors_origins: str = Field(default="", alias="INSPECTOR_CORS_ORIGINS")
+    # Requests per minute per API key (or client IP when auth is off). 0 = off.
+    rate_limit_per_minute: int = Field(default=120, alias="INSPECTOR_RATE_LIMIT_PER_MINUTE")
+    log_json: bool = Field(default=True, alias="INSPECTOR_LOG_JSON")
+    log_level: str = Field(default="INFO", alias="INSPECTOR_LOG_LEVEL")
+    metrics_enabled: bool = Field(default=True, alias="INSPECTOR_METRICS_ENABLED")
     # Longest side images are resized to before being sent to the VLM.
     vlm_image_max_side: int = 1568
 
@@ -65,6 +73,10 @@ class Settings(BaseSettings):
     @property
     def api_key_set(self) -> set[str]:
         return {k.strip() for k in self.api_keys.split(",") if k.strip()}
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     @property
     def provider_order(self) -> list[str]:

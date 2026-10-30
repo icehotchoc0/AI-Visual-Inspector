@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from typing import Sequence
 
+from backend.observability import record_vlm_call
 from backend.vlm.base import VLMError, VLMProvider, VLMRequest, VLMResponse, VLMUnavailable
 
 log = logging.getLogger(__name__)
@@ -78,16 +79,20 @@ class VLMRouter:
             try:
                 response = provider.complete_json(request)
                 validate_against_schema(response.data, request.schema)
+                record_vlm_call(provider.name, request.task, "ok", response.latency_ms / 1000.0, response.usage)
                 return response
             except SchemaViolation as exc:
+                record_vlm_call(provider.name, request.task, "schema_violation")
                 errors[provider.name] = f"schema violation: {exc}"
                 log.warning("VLM provider %s returned invalid JSON for %s: %s", provider.name, request.task, exc)
             except VLMError as exc:
+                record_vlm_call(provider.name, request.task, "error")
                 errors[provider.name] = str(exc)
                 log.warning("VLM provider %s failed for %s: %s", provider.name, request.task, exc)
                 if not exc.retryable:
                     break
             except Exception as exc:  # noqa: BLE001 - a buggy provider must not take the request down
+                record_vlm_call(provider.name, request.task, "crash")
                 errors[provider.name] = f"unexpected {type(exc).__name__}: {exc}"
                 log.exception("VLM provider %s crashed for %s", provider.name, request.task)
         raise VLMUnavailable(errors)

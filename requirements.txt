@@ -13,12 +13,17 @@ ollama>=0.4.0          # local fallback (Qwen2.5-VL)
 
 # Imaging / numerics
 pillow>=10.0.0
+pillow-heif>=0.16.0   # iPhone HEIC originals
 numpy>=1.26.0
 opencv-python-headless>=4.9.0
 
 # Dashboard
 streamlit>=1.38.0   # page_icon=":material/..." 지원
 requests>=2.31.0
+
+# Operations
+prometheus-client>=0.20.0
+sqlalchemy>=2.0
 
 # Testing
 pytest>=8.0.0

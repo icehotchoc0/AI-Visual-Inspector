@@ -107,7 +107,7 @@ with tab_run:
         st.markdown(f"**검사 하자 항목 {len(cat['defect_codes'])}개:** " + ", ".join(d["name"] for d in cat["defect_codes"]))
 
     st.subheader("1. 사진 업로드와 컷 지정")
-    uploads = st.file_uploader("작업 사진 (여러 장)", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
+    uploads = st.file_uploader("작업 사진 (여러 장)", type=["png", "jpg", "jpeg", "heic", "heif"], accept_multiple_files=True)
     shot_options = ["(미지정)"] + [s["id"] for s in cat["shots"]]
     shot_names = {s["id"]: s["name"] for s in cat["shots"]}
     phase_options = {"(미지정)": None, "작업 전": "before", "작업 후": "after"}

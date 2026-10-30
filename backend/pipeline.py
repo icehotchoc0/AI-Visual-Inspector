@@ -21,6 +21,14 @@ from datetime import datetime, timezone
 
 from PIL import Image, ImageOps
 
+try:  # iPhone originals are HEIC; register the opener once so Image.open understands them.
+    import pillow_heif
+
+    pillow_heif.register_heif_opener()
+    HEIC_SUPPORTED = True
+except ImportError:  # pragma: no cover
+    HEIC_SUPPORTED = False
+
 from backend.categories import Category, CategoryRegistry
 from backend.checks.checklist import evaluate_checklist
 from backend.checks.fraud import build_meta, run_fraud_checks

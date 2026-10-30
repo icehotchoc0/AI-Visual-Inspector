@@ -19,12 +19,14 @@ from contextlib import asynccontextmanager
 from functools import lru_cache
 from typing import Optional
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Response, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
 from backend.auth import require_api_key
+from backend.observability import RequestIdMiddleware, configure_logging, metrics_payload, record_inspection
+from backend.ratelimit import rate_limited
 from backend.categories import CategoryRegistry, load_registry
 from backend.config import settings
 from backend.pipeline import PIPELINE_VERSION, InspectionPipeline, PipelineError
@@ -58,12 +60,14 @@ def get_pipeline() -> InspectionPipeline:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    configure_logging(settings.log_json, settings.log_level)
     if not settings.api_key_set:
         log.warning("INSPECTOR_API_KEYS is empty - API authentication is DISABLED. Set it before exposing this service.")
     reg = get_registry()
     vlm = get_vlm()
-    log.info("categories: %s | vlm providers: %s | db: %s", reg.ids, vlm.names if vlm else "disabled", settings.db_path)
+    log.info("categories: %s | vlm providers: %s | db: %s | cors: %s | rate limit: %s/min", reg.ids, vlm.names if vlm else "disabled", settings.db_path, settings.cors_origin_list or "off", settings.rate_limit_per_minute)
+    if "*" in settings.cors_origin_list:
+        log.warning("INSPECTOR_CORS_ORIGINS=* allows any browser origin - do not use in production.")
     yield
 
 
@@ -73,7 +77,9 @@ app = FastAPI(
     version=PIPELINE_VERSION,
     lifespan=lifespan,
 )
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+if settings.cors_origin_list:
+    app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origin_list, allow_methods=["GET", "POST"], allow_headers=["*"], expose_headers=["X-Request-ID"])
+app.add_middleware(RequestIdMiddleware)
 
 
 # ------------------------------------------------------------- routes --
@@ -99,6 +105,14 @@ def health() -> dict:
     }
 
 
+@app.get("/metrics", include_in_schema=False)
+def metrics() -> Response:
+    if not settings.metrics_enabled:
+        raise HTTPException(404, "metrics disabled")
+    body, content_type = metrics_payload()
+    return Response(content=body, media_type=content_type)
+
+
 def _probe_provider(provider) -> dict:
     """Cheap reachability probe - never calls the model."""
     info: dict = {"model": getattr(provider, "model", None), "reachable": None, "error": None}
@@ -122,13 +136,13 @@ def _probe_provider(provider) -> dict:
     return info
 
 
-@app.get("/v1/categories/groups", response_model=list[GroupInfo], dependencies=[Depends(require_api_key)])
+@app.get("/v1/categories/groups", response_model=list[GroupInfo], dependencies=[Depends(rate_limited)])
 def list_category_groups() -> list[GroupInfo]:
     reg = get_registry()
     return [GroupInfo(id=g.id, name=g.name, order=g.order, category_ids=[c.id for c in reg.all(g.id)]) for g in reg.groups]
 
 
-@app.get("/v1/categories", response_model=list[CategoryInfo], dependencies=[Depends(require_api_key)])
+@app.get("/v1/categories", response_model=list[CategoryInfo], dependencies=[Depends(rate_limited)])
 def list_categories(group: Optional[str] = Query(default=None, description="그룹 id 로 필터 (appliance | housing | commercial ...)")) -> list[CategoryInfo]:
     reg = get_registry()
     out = []
@@ -144,12 +158,12 @@ def list_categories(group: Optional[str] = Query(default=None, description="그�
     return out
 
 
-@app.post("/v1/inspections", response_model=InspectionResult, dependencies=[Depends(require_api_key)])
+@app.post("/v1/inspections", response_model=InspectionResult, dependencies=[Depends(rate_limited)])
 async def create_inspection(request: InspectionRequest) -> InspectionResult:
     return await _run(request, None)
 
 
-@app.post("/v1/inspections/upload", response_model=InspectionResult, dependencies=[Depends(require_api_key)])
+@app.post("/v1/inspections/upload", response_model=InspectionResult, dependencies=[Depends(rate_limited)])
 async def create_inspection_upload(
     job: str = Form(..., description="JobContext JSON"),
     photos: Optional[str] = Form(default=None, description="JSON array of PhotoInput metadata (photo_id must equal the uploaded filename stem or filename)"),
@@ -187,12 +201,15 @@ async def create_inspection_upload(
 async def _run(request: InspectionRequest, images: dict[str, bytes] | None) -> InspectionResult:
     pipeline = get_pipeline()
     try:
-        return await run_in_threadpool(pipeline.run, request, images)
+        result = await run_in_threadpool(pipeline.run, request, images)
     except PipelineError as exc:
         raise HTTPException(400, str(exc)) from exc
+    record_inspection(result, mode="sync")
+    log.info("inspection done", extra={"event": "inspection", "inspection_id": result.inspection_id, "job_id": result.job_id, "category": result.category, "verdict": result.verdict, "latency_ms": result.stats.get("latency_ms")})
+    return result
 
 
-@app.get("/v1/inspections", response_model=list[InspectionListItem], dependencies=[Depends(require_api_key)])
+@app.get("/v1/inspections", response_model=list[InspectionListItem], dependencies=[Depends(rate_limited)])
 def list_inspections(
     limit: int = Query(default=50, ge=1, le=500),
     job_id: Optional[str] = None,
@@ -202,7 +219,7 @@ def list_inspections(
     return get_store().list(limit=limit, job_id=job_id, category=category, verdict=verdict)
 
 
-@app.get("/v1/inspections/{inspection_id}", response_model=InspectionResult, dependencies=[Depends(require_api_key)])
+@app.get("/v1/inspections/{inspection_id}", response_model=InspectionResult, dependencies=[Depends(rate_limited)])
 def get_inspection(inspection_id: str) -> InspectionResult:
     result = get_store().get(inspection_id)
     if result is None:
