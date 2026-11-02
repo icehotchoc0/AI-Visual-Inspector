@@ -106,6 +106,9 @@ def decide(
     rejected = [p for p in photos if p.status == "REJECTED"]
     if rejected:
         notes.append(f"품질 문제로 반려된 사진 {len(rejected)}장 (재촬영 권장): " + ", ".join(p.photo_id for p in rejected))
+    soft = [p for p in photos if p.status != "REJECTED" and any(f.kind == "quality" and f.severity == "medium" for f in p.findings)]
+    if soft:
+        notes.append(f"선명도·밝기 경고 {len(soft)}장 (판정에는 반영됨): " + ", ".join(p.photo_id for p in soft))
 
     # ---- 7. VLM availability -------------------------------------------------
     if vlm_requested and not vlm_available:

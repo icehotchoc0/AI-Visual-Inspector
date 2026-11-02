@@ -71,7 +71,7 @@ multipart/form-data. 서비스 백엔드가 파일을 그대로 중계할 때 �
       "declared_shot_type": "pipe_connection",
       "resolved_shot_type": "pipe_connection",
       "phase": "after",
-      "quality": {"width": 3024, "height": 4032, "blur_score": 412.5, "brightness": 131.0, "contrast": 55.2, "passed": true},
+      "quality": {"width": 3024, "height": 4032, "sharpness": 58.2, "blur_score": 41.5, "brightness": 131.0, "contrast": 55.2, "passed": true},
       "meta": {"exif_datetime": "2026-10-29T10:12:44", "gps_lat": 37.56, "gps_lon": 126.97, "camera_model": "SM-S928N", "software": null,
                "perceptual_hash": "9c6e3b1d8f0a2c47", "sha256": "..."},
       "analysis": {"shot_type": "pipe_connection", "shot_confidence": 0.93, "work_area_visible": true,
@@ -117,7 +117,7 @@ multipart/form-data. 서비스 백엔드가 파일을 그대로 중계할 때 �
 
 | kind | source | code 예 |
 |---|---|---|
-| quality | quality_check | `blurry`, `too_dark`, `overexposed`, `low_resolution`, `low_contrast` |
+| quality | quality_check | 반려(high): `blurry`, `too_dark`, `overexposed` · 경고(medium, 판정 계속): `low_sharpness`, `dim`, `bright`, `low_resolution`, `low_contrast` |
 | fraud | fraud_check | `duplicate_in_job`, `near_duplicate_in_job`, `reused_from_other_job`, `similar_to_other_job`, `gps_spread`, `gps_far_from_site`, `captured_outside_schedule`, `capture_time_spread`, `edited_with_software` |
 | checklist | checklist | `missing_required_shot`, `before_after_incomplete`, `unclassified_photo` |
 | consistency | vlm | `shot_type_mismatch`, `work_area_not_visible`, `before_after_different_location`, `work_not_visible_after` |

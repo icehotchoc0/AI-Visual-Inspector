@@ -91,7 +91,8 @@ class JobStatus(BaseModel):
 class PhotoQuality(BaseModel):
     width: int
     height: int
-    blur_score: float
+    blur_score: float = Field(description="variance of Laplacian (reference only)")
+    sharpness: float = Field(default=0.0, description="strongest-edge score 0..255, brightness-normalised; the decision metric")
     brightness: float
     contrast: float
     passed: bool

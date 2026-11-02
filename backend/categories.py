@@ -45,12 +45,28 @@ class DefectSpec(BaseModel):
 
 
 class QualityThresholds(BaseModel):
+    """Two tiers: *_warn -> medium finding (photo still analysed), *_reject -> REJECTED.
+    Defaults are deliberately lenient for hand-held field photos under room light;
+    calibrate with scripts/quality_calibrate.py."""
     min_width: int = 640
     min_height: int = 480
-    blur_threshold: float = 60.0
-    dark_threshold: float = 45.0
-    bright_threshold: float = 225.0
-    low_contrast_threshold: float = 18.0
+    sharpness_warn: float = 30.0     # strongest-edge score (0..255). below = "조금 흐림"
+    sharpness_reject: float = 12.0   # below = unusable
+    dark_warn: float = 35.0          # mean brightness (0..255)
+    dark_reject: float = 12.0
+    bright_warn: float = 228.0
+    bright_reject: float = 248.0
+    low_contrast_threshold: float = 10.0
+
+    @model_validator(mode="before")
+    @classmethod
+    def _legacy_keys(cls, data):
+        # Old single-tier keys (blur_threshold etc.) are ignored with a warning; new keys win.
+        if isinstance(data, dict):
+            legacy = {k: data.pop(k) for k in ("blur_threshold", "dark_threshold", "bright_threshold") if k in data}
+            if legacy:
+                log.warning("quality thresholds %s are obsolete; use sharpness_warn/reject, dark_warn/reject, bright_warn/reject", list(legacy))
+        return data
 
 
 class FraudThresholds(BaseModel):

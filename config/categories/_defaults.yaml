@@ -22,10 +22,16 @@ defaults:
   quality:
     min_width: 640
     min_height: 480
-    blur_threshold: 60.0
-    dark_threshold: 45.0
-    bright_threshold: 225.0
-    low_contrast_threshold: 18.0
+    # 선명도: 가장 또렷한 모서리 강도(0~255, 밝기 보정 후). warn 미만이면 '조금 흐림' 경고만, reject 미만이면 반려.
+    # 매끈한 벽·가전 패널을 실내 조명에서 찍은 사진은 선명해도 30~60 대가 흔함. 기기별 보정: scripts/quality_calibrate.py
+    sharpness_warn: 30.0
+    sharpness_reject: 12.0
+    # 밝기(평균 0~255): warn 밖이면 경고, reject 밖이면 반려
+    dark_warn: 35.0
+    dark_reject: 12.0
+    bright_warn: 228.0
+    bright_reject: 248.0
+    low_contrast_threshold: 10.0
   fraud:
     duplicate_hamming_max: 6
     near_duplicate_hamming_max: 12

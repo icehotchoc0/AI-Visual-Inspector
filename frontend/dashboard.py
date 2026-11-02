@@ -185,7 +185,7 @@ with tab_run:
                     if p["photo_id"] in imgs:
                         st.image(imgs[p["photo_id"]], use_container_width=True)
                     q = p["quality"]
-                    st.caption(f"{q['width']}×{q['height']} · 선명도 {q['blur_score']:.0f} · 밝기 {q['brightness']:.0f}")
+                    st.caption(f"{q['width']}×{q['height']} · 선명도 {q.get('sharpness', 0):.0f} · 밝기 {q['brightness']:.0f}")
                     a = p["analysis"]
                     if a.get("provider") and a["provider"] != "none":
                         st.caption(f"AI 분석: {a['provider']} ({a.get('model')}) · {a.get('latency_ms', 0):.0f} ms")

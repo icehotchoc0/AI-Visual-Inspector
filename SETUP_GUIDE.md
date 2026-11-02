@@ -109,7 +109,7 @@ CUDA 빌드 torch 는 PyPI 기본 휠이 아니므로 `pip install torch torchvi
 | `/health` 에서 `claude.reachable=false`, "no ANTHROPIC_API_KEY" | `.env` 또는 환경변수에 키 없음 |
 | 판정이 전부 `REVIEW`, 근거에 "VLM 공급자에 모두 연결할 수 없어" | 두 공급자 모두 실패. 백엔드 로그의 `VLM provider ... failed` 줄 확인 |
 | Ollama 가 `0.0.0.0` 에 연결 시도 | 시스템 `OLLAMA_HOST` 가 서버 바인드용으로 설정된 경우. 이 프로젝트는 `INSPECTOR_OLLAMA_HOST` 만 읽으므로 그 값을 확인 |
-| 사진이 전부 `REJECTED` | 블러 임계값(`quality.blur_threshold`)이 촬영 기기와 안 맞음. 응답의 `quality.blur_score` 분포를 보고 YAML 조정 |
+| 사진이 전부 흐림으로 나옴 | 현장 사진 폴더로 `python scripts/quality_calibrate.py <폴더>` 를 돌려 선명도 분포를 보고 `_defaults.yaml` 의 `sharpness_warn/reject` 조정. 경고(medium)는 판정을 막지 않으며 반려(high)만 증빙에서 제외됨 |
 | 중복 오탐 (`duplicate_in_job`) | 같은 설비를 거의 같은 구도로 찍은 경우. `fraud.duplicate_hamming_max` 를 4 로 낮추거나 컷 가이드로 구도 분리 |
 | 401 | `X-API-Key` 헤더 누락 또는 `INSPECTOR_API_KEYS` 불일치 |
 

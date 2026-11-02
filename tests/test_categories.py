@@ -11,7 +11,7 @@ def test_registry_loads_all_categories(registry):
     for c in registry.all():
         assert c.required_shots, c.id
         assert c.defect_rubric, c.id
-        assert c.quality.blur_threshold > 0
+        assert c.quality.sharpness_warn > c.quality.sharpness_reject > 0
         assert c.verdict.missing_required_shot in ("fail", "review")
 
 
@@ -40,12 +40,12 @@ def test_duplicate_shot_ids_rejected():
 def test_from_yaml_override(tmp_path):
     p = tmp_path / "c.yaml"
     p.write_text(
-        "defaults:\n  quality: {blur_threshold: 10}\ncategories:\n  - id: t\n    name: T\n    quality: {min_width: 100}\n    shots: [{id: s, name: S, required: true}]\n",
+        "defaults:\n  quality: {sharpness_warn: 10}\ncategories:\n  - id: t\n    name: T\n    quality: {min_width: 100}\n    shots: [{id: s, name: S, required: true}]\n",
         encoding="utf-8",
     )
     reg = CategoryRegistry.from_yaml(p)
     c = reg.get("t")
-    assert c.quality.blur_threshold == 10 and c.quality.min_width == 100
+    assert c.quality.sharpness_warn == 10 and c.quality.min_width == 100
 
 
 def test_directory_layout_groups_and_disabled(tmp_path):
