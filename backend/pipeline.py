@@ -88,6 +88,7 @@ class InspectionPipeline:
 
         # ---- decode ----
         decoded: dict[str, tuple[Image.Image, bytes]] = {}
+        formats: dict[str, str] = {}  # original container format; exif_transpose() returns an image with format=None
         seen_ids: set[str] = set()
         for p in request.photos:
             if p.photo_id in seen_ids:
@@ -106,6 +107,7 @@ class InspectionPipeline:
             try:
                 img = Image.open(io.BytesIO(raw))
                 img.load()
+                formats[p.photo_id] = (img.format or "jpeg").lower()
                 img = ImageOps.exif_transpose(img) or img
             except Exception as exc:  # noqa: BLE001
                 raise PipelineError(f"photo '{p.photo_id}': cannot decode image ({type(exc).__name__})") from exc
@@ -298,7 +300,7 @@ class InspectionPipeline:
             try:
                 for p in result.photos:
                     img, raw = decoded[p.photo_id]
-                    ext = (img.format or "jpg").lower().replace("jpeg", "jpg").replace("heif", "heic")
+                    ext = {"jpeg": "jpg", "heif": "heic", "mpo": "jpg"}.get(formats.get(p.photo_id, "jpeg"), formats.get(p.photo_id, "jpg"))
                     self.photo_store.save(result.inspection_id, p.photo_id, raw, ext, result.created_at)
                     p.stored = True
                 photos_stored = True
