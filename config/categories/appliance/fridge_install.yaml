@@ -1,0 +1,29 @@
+# 냉장고 설치
+id: fridge_install
+name: 냉장고 설치
+group: appliance
+order: 30
+description: >
+  냉장고(양문형·4도어·김치냉장고 포함) 신규 설치 또는 교체 설치. 기존 기기 철거, 반입·위치 잡기,
+  수평 조정, 도어 정렬, 벽과의 이격 확보, 전원 연결, (얼음정수 모델) 직수 연결, 보호 필름·포장재 제거까지 포함.
+shots:
+  - {id: site_before, name: 설치 전 공간, description: 냉장고를 놓을 공간 또는 기존 기기가 보이는 설치 전 사진, required: true, phase: before}
+  - {id: unit_installed, name: 설치 완료, description: 설치가 끝난 냉장고 정면 전체와 양옆 벽·가구가 함께 보이는 사진, required: true, phase: after}
+  - {id: door_alignment, name: 도어 정렬·수평, description: 도어를 닫은 상태에서 양쪽 도어 높이와 틈이 보이는 정면 상단 클로즈업 또는 수평계 사진, required: true, phase: after}
+  - {id: clearance_side, name: 이격 확인, description: 냉장고 뒷면·측면과 벽 사이 간격이 보이는 사진, required: false, phase: after}
+  - {id: power_connection, name: 전원 연결, description: 플러그가 꽂힌 콘센트(접지형)와 전원선 경로 사진, required: false, phase: after}
+  - {id: water_line_connection, name: 직수 연결부, description: 얼음정수 모델의 급수관·밸브·어댑터 연결부 사진, required: false, phase: after}
+  - {id: operation_test, name: 작동 확인, description: 전원이 켜져 디스플레이에 온도·설정이 표시되는 사진, required: false, phase: after}
+  - {id: model_label, name: 모델 라벨, description: 모델명·시리얼 번호 라벨 사진, required: false, phase: any}
+before_after_pairs:
+  - [site_before, unit_installed]
+defect_rubric:
+  - {code: door_misaligned, name: 도어 단차·밀착 불량, description: 양쪽 도어 높이가 다르거나 닫힌 상태에서 틈이 벌어짐, default_severity: medium}
+  - {code: unit_tilted, name: 수평 불량, description: 냉장고가 앞뒤·좌우로 기울어 도어가 저절로 열리거나 닫히지 않음, default_severity: medium}
+  - {code: insufficient_clearance, name: 이격 부족, description: 뒷면·측면·상부가 벽이나 가구에 밀착되어 방열 공간이 없음, default_severity: medium}
+  - {code: exposed_wiring, name: 전선 노출·배선 불량, description: 전원선이 기기 아래 눌려 있거나 피복 손상, 멀티탭 과부하 연결, default_severity: high}
+  - {code: leak_visible, name: 누수, description: 직수 연결부·기기 하부의 물방울·물 고임, default_severity: high}
+  - {code: protective_film_left, name: 보호 필름·포장재 미제거, description: 도어·패널의 보호 비닐, 내부 고정 테이프·스티로폼이 남아 있음, default_severity: low}
+  - {code: scratch_dent, name: 외관 손상, description: 반입·설치 중 생긴 도어·패널 긁힘·찍힘, default_severity: low}
+  - {code: wall_damage, name: 벽·바닥 손상, description: 반입 과정에서 생긴 벽지 찢김·바닥 긁힘, default_severity: medium}
+  - {code: debris_left, name: 잔재물/청소 미흡, description: 포장재·구 기기·공구 방치, default_severity: low}

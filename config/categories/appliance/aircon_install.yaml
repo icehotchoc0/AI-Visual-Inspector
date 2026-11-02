@@ -1,5 +1,6 @@
 # 에어컨 설치
 id: aircon_install
+order: 10
 name: 에어컨 설치
 group: appliance
 description: >

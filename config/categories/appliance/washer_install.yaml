@@ -1,0 +1,27 @@
+# 세탁기 설치
+id: washer_install
+name: 세탁기 설치
+group: appliance
+order: 20
+description: >
+  드럼/통돌이 세탁기(건조기 포함) 신규 설치 또는 교체 설치. 기존 기기 철거, 급수 호스·배수 호스 연결,
+  수평 조정과 고정, 전원 연결, 시운전(급수·배수 확인), 포장재·운송 볼트 제거까지 포함.
+shots:
+  - {id: site_before, name: 설치 전 공간, description: 세탁기를 놓을 공간 또는 기존 기기·급수 밸브·배수구가 보이는 설치 전 사진, required: true, phase: before}
+  - {id: water_drain_connection, name: 급수·배수 호스 연결부, description: 급수 호스가 수도 밸브에, 배수 호스가 배수구(또는 트랩)에 연결된 부위가 선명하게 보이는 사진, required: true, phase: after}
+  - {id: unit_installed, name: 설치 완료, description: 설치가 끝난 세탁기 정면 전체(건조기 직렬 설치 시 스태킹 키트 포함)가 보이는 사진, required: true, phase: after}
+  - {id: leveling, name: 수평·고정 확인, description: 수평계를 댄 상태 또는 조절 다리·고정 너트가 조여진 하부 사진, required: true, phase: after}
+  - {id: operation_test, name: 시운전, description: 전원이 켜져 급수 또는 탈수가 진행되는 디스플레이·드럼 사진, required: false, phase: after}
+  - {id: power_connection, name: 전원 연결, description: 플러그가 꽂힌 콘센트(접지형)와 전원선 경로 사진, required: false, phase: after}
+  - {id: transit_bolts_removed, name: 운송 볼트 제거, description: 드럼 세탁기 뒷면 운송 고정 볼트가 제거된 상태 또는 제거한 볼트 사진, required: false, phase: after}
+before_after_pairs:
+  - [site_before, unit_installed]
+defect_rubric:
+  - {code: hose_loose, name: 호스 체결 불량, description: 급수 호스가 밸브에 느슨하게 체결되었거나 배수 호스가 배수구에 고정되지 않고 걸쳐만 있음, default_severity: high}
+  - {code: water_leak, name: 누수, description: 급수 밸브·호스 연결부·세탁기 하부의 물방울·물 고임·젖은 바닥, default_severity: high}
+  - {code: drain_hose_fault, name: 배수 호스 설치 불량, description: 배수 호스가 심하게 꺾였거나 바닥에 늘어져 있거나 권장 높이보다 낮게/높게 고정됨, default_severity: medium}
+  - {code: unit_tilted, name: 수평 불량, description: 세탁기가 기울어져 있거나 조절 다리가 바닥에서 떠 있어 진동·소음 원인이 됨, default_severity: medium}
+  - {code: transit_bolts_left, name: 운송 볼트 미제거, description: 드럼 세탁기 뒷면에 운송 고정 볼트가 그대로 남아 있음, default_severity: high}
+  - {code: exposed_wiring, name: 전선 노출, description: 마감되지 않은 전선·접속부 노출 또는 멀티탭 과부하 연결, default_severity: high}
+  - {code: scratch_dent, name: 외관 손상, description: 설치 과정에서 생긴 패널 긁힘·찍힘·변형 또는 보호 필름 미제거, default_severity: low}
+  - {code: debris_left, name: 잔재물/청소 미흡, description: 포장재·스티로폼·구 기기·공구 방치, default_severity: low}
