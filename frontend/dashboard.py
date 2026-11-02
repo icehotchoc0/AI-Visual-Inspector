@@ -243,7 +243,14 @@ with tab_review:
             with cols[i % len(cols)]:
                 st.markdown(f"{STATUS_MARK[p['status']]} **{p['photo_id']}** · {p.get('resolved_shot_type') or '미분류'}")
                 if p.get("stored"):
-                    st.image(f"{API_URL}/v1/inspections/{pick}/photos/{p['photo_id']}" if not API_KEY else requests.get(f"{API_URL}/v1/inspections/{pick}/photos/{p['photo_id']}", headers=HEADERS, timeout=10).content, use_container_width=True)
+                    try:
+                        pr = requests.get(f"{API_URL}/v1/inspections/{pick}/photos/{p['photo_id']}", headers=HEADERS, timeout=20)
+                        if pr.ok and pr.headers.get("content-type", "").startswith("image/"):
+                            st.image(pr.content, use_container_width=True)
+                        else:
+                            st.caption(f"사진을 불러오지 못했습니다 ({pr.status_code}): {pr.text[:120]}")
+                    except requests.RequestException as exc:
+                        st.caption(f"사진을 불러오지 못했습니다: {exc}")
                 else:
                     st.caption("사진 미보관 (INSPECTOR_PHOTO_STORE_DIR 설정 시 표시)")
                 for f in p["findings"]:

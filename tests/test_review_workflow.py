@@ -45,7 +45,14 @@ def test_review_queue_and_decision(env):
     assert [q["inspection_id"] for q in queue] == [res["inspection_id"]]
     assert client.get(f"/v1/inspections/{res['inspection_id']}/review").json()["review_verdict"] is None
     img = client.get(f"/v1/inspections/{res['inspection_id']}/photos/p0")
-    assert img.status_code == 200 and img.headers["content-type"].startswith("image/")
+    assert img.status_code == 200 and img.headers["content-type"] == "image/jpeg"
+    import io
+
+    from PIL import Image
+
+    assert Image.open(io.BytesIO(img.content)).size[0] <= 1600
+    raw = client.get(f"/v1/inspections/{res['inspection_id']}/photos/p0", params={"raw": "true"})
+    assert raw.status_code == 200 and raw.content[:3] == b"\xff\xd8\xff"  # original JPEG bytes
     assert client.get(f"/v1/inspections/{res['inspection_id']}/photos/zzz").status_code == 404
     r = client.post(f"/v1/inspections/{res['inspection_id']}/review", json={"verdict": "FAIL", "reviewer": "김검수", "notes": "#leak_visible 이음부 누수"})
     assert r.status_code == 200
@@ -82,3 +89,23 @@ def test_export_eval_set_uses_reviewer_labels(env, tmp_path):
     assert (tmp_path / "eval" / "plumbing" / "photos" / "E-1" / "p0.jpg").exists()
     # a tag only becomes a defect label when that code was actually a finding on the photo
     assert all(d["code"] != "blurry" for p in by_job["E-2"]["photos"] for d in p["defects"])
+
+
+def test_heic_photo_is_served_as_jpeg(env):
+    pillow_heif = pytest.importorskip("pillow_heif")
+    import io
+
+    from PIL import Image
+
+    client, store, ps = env
+    buf = io.BytesIO()
+    pillow_heif.from_pillow(make_photo(321)).save(buf, quality=90)
+    files = [("files", ("site_before.heic", buf.getvalue(), "image/heic"))]
+    data = {"job": json.dumps({"job_id": "H-1", "category": "plumbing"}), "photos": json.dumps([{"photo_id": "site_before", "declared_shot_type": "site_before"}])}
+    r = client.post("/v1/inspections/upload", data=data, files=files)
+    assert r.status_code == 200 and r.json()["verdict"] == "REVIEW"
+    iid = r.json()["inspection_id"]
+    assert ps.find(iid, "site_before").suffix == ".heic"
+    img = client.get(f"/v1/inspections/{iid}/photos/site_before")
+    assert img.status_code == 200 and img.headers["content-type"] == "image/jpeg"
+    assert Image.open(io.BytesIO(img.content)).format == "JPEG"

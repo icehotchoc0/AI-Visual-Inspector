@@ -339,12 +339,35 @@ def get_inspection(inspection_id: str) -> InspectionResult:
 
 
 @app.get("/v1/inspections/{inspection_id}/photos/{photo_id}", dependencies=[Depends(rate_limited)])
-def get_inspection_photo(inspection_id: str, photo_id: str) -> Response:
+def get_inspection_photo(
+    inspection_id: str,
+    photo_id: str,
+    raw: bool = Query(default=False, description="true = 보관된 원본 바이트 그대로 (HEIC 포함). 기본은 브라우저용 JPEG 변환"),
+    max_side: int = Query(default=1600, ge=200, le=6000),
+) -> Response:
     ps = get_photo_store()
     if ps is None:
         raise HTTPException(404, "photo retention is disabled (INSPECTOR_PHOTO_STORE_DIR)")
     path = ps.find(inspection_id, photo_id)
     if path is None:
         raise HTTPException(404, "photo not retained for this inspection")
-    media = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "heic": "image/heic", "webp": "image/webp"}.get(path.suffix.lstrip(".").lower(), "application/octet-stream")
-    return Response(content=path.read_bytes(), media_type=media, headers={"Cache-Control": "private, max-age=300"})
+    ext = path.suffix.lstrip(".").lower()
+    if raw:
+        media = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "heic": "image/heic", "heif": "image/heif", "webp": "image/webp"}.get(ext, "application/octet-stream")
+        return Response(content=path.read_bytes(), media_type=media, headers={"Cache-Control": "private, max-age=300"})
+    # Browsers and the dashboard cannot show HEIC; serve a downscaled JPEG rendition
+    # (EXIF orientation applied, metadata stripped).
+    import io
+
+    from PIL import Image, ImageOps
+
+    try:
+        img = Image.open(path)
+        img = ImageOps.exif_transpose(img) or img
+        img = img.convert("RGB")
+        img.thumbnail((max_side, max_side))
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=85)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(500, f"cannot render photo: {type(exc).__name__}") from exc
+    return Response(content=buf.getvalue(), media_type="image/jpeg", headers={"Cache-Control": "private, max-age=300"})
