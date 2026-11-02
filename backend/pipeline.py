@@ -330,7 +330,7 @@ class InspectionPipeline:
         d = resp.data
         analysis = PhotoAnalysis(
             shot_type=d.get("shot_type"),
-            shot_confidence=float(d.get("shot_confidence", 0.0)),
+            shot_confidence=_clamp01(d.get("shot_confidence", 0.0)),
             work_area_visible=d.get("work_area_visible"),
             scene_description=d.get("scene_description"),
             provider=resp.provider,
@@ -349,7 +349,7 @@ class InspectionPipeline:
                     kind="defect",
                     source="vlm",
                     severity=severity,
-                    confidence=max(0.0, min(1.0, float(item.get("confidence", 0.5)))),
+                    confidence=_clamp01(item.get("confidence", 0.5)),
                     photo_id=photo.photo_id,
                     message=f"{title}: {item.get('description', '').strip()}".rstrip(": "),
                     location_hint=item.get("location") or None,
@@ -376,7 +376,7 @@ class InspectionPipeline:
             return [], {}
         d = resp.data
         findings: list[Finding] = []
-        conf = float(d.get("confidence", 0.0))
+        conf = _clamp01(d.get("confidence", 0.0))
         related = [b_pid, a_pid]
         if d.get("same_location") is False:
             findings.append(
@@ -415,6 +415,13 @@ class InspectionPipeline:
                         message=f"사진 '{pid}'이(가) 정상 사진 분포에서 벗어납니다 (score={res.anomaly_score:.3f}).",
                         data={"anomaly_score": res.anomaly_score, "backend": det.backend, "model_key": det.category})
         return res.anomaly_score, f
+
+
+def _clamp01(value) -> float:
+    try:
+        return max(0.0, min(1.0, float(value)))
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _thumbnail_b64(image: Image.Image, size: int = 256) -> str:

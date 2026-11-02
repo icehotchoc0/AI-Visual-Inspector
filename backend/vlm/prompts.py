@@ -77,6 +77,8 @@ def analyze_photo_prompt(
 위 사진을 시스템 지시에 따라 분석하고 JSON 으로 답하십시오."""
 
 
+# NOTE: Anthropic structured outputs reject numeric "minimum"/"maximum" (400 invalid_request_error),
+# so confidences are described in prose and clamped to [0, 1] in the pipeline instead.
 def analyze_photo_schema(category: Category) -> dict:
     shot_enum = category.shot_ids + ["other"]
     defect_enum = [d.code for d in category.defect_rubric] + ["other"]
@@ -86,7 +88,7 @@ def analyze_photo_schema(category: Category) -> dict:
         "required": ["shot_type", "shot_confidence", "work_area_visible", "scene_description", "defects", "visibility_note"],
         "properties": {
             "shot_type": {"type": "string", "enum": shot_enum},
-            "shot_confidence": {"type": "number", "minimum": 0, "maximum": 1},
+            "shot_confidence": {"type": "number", "description": "0에서 1 사이"},
             "work_area_visible": {"type": "boolean"},
             "scene_description": {"type": "string"},
             "visibility_note": {"type": "string", "description": "빈 문자열 허용"},
@@ -101,7 +103,7 @@ def analyze_photo_schema(category: Category) -> dict:
                         "title": {"type": "string"},
                         "description": {"type": "string"},
                         "severity": {"type": "string", "enum": ["low", "medium", "high"]},
-                        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+                        "confidence": {"type": "number", "description": "0에서 1 사이"},
                         "location": {"type": "string"},
                         "evidence": {"type": "string"},
                     },
@@ -132,7 +134,7 @@ COMPARE_SCHEMA: dict = {
     "required": ["same_location", "confidence", "work_completed_visible", "changes_description", "concerns"],
     "properties": {
         "same_location": {"type": "boolean"},
-        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "confidence": {"type": "number", "description": "0에서 1 사이"},
         "work_completed_visible": {"type": "boolean"},
         "changes_description": {"type": "string"},
         "concerns": {"type": "array", "items": {"type": "string"}},

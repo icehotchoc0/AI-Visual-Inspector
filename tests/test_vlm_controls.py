@@ -156,3 +156,27 @@ def test_cacheable_context_reaches_fake_provider(registry, test_settings, store)
     photo_calls = [c for c in fake.calls if c.task == "analyze_photo"]
     assert photo_calls and all(c.cacheable_context and "에어컨" not in c.cacheable_context and "배관" in c.cacheable_context for c in photo_calls)
     assert all(c.prompt.startswith("기사가 신고한 컷") for c in photo_calls)
+
+
+def test_generated_schemas_avoid_unsupported_numeric_bounds(registry):
+    """Anthropic structured outputs return 400 for numeric minimum/maximum."""
+    import json
+
+    from backend.vlm.prompts import COMPARE_SCHEMA, analyze_photo_schema
+
+    for cat in registry.all():
+        text = json.dumps(analyze_photo_schema(cat))
+        assert '"minimum"' not in text and '"maximum"' not in text
+    assert '"minimum"' not in json.dumps(COMPARE_SCHEMA)
+
+
+def test_out_of_range_confidences_are_clamped(registry, test_settings, store):
+    from tests.conftest import FakeVLM, analysis, defect, make_photo, make_pipeline, to_b64
+    from backend.schemas import InspectionRequest, JobContext, PhotoInput
+
+    fake = FakeVLM(script={"site_before": analysis("site_before", [defect("leak_visible", "high", 7.0)], conf=1.7)})
+    pipe = make_pipeline(registry, test_settings, fake, store)
+    req = InspectionRequest(job=JobContext(job_id="clamp", category="plumbing"), photos=[PhotoInput(photo_id="p0", image_base64=to_b64(make_photo(123)), declared_shot_type="site_before")])
+    res = pipe.run(req)
+    p = res.photos[0]
+    assert p.analysis.shot_confidence == 1.0 and all(0 <= f.confidence <= 1 for f in p.findings)
