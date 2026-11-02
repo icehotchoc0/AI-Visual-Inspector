@@ -1,0 +1,17 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.git/
+.github/
+backend/data/
+datasets/
+results/
+lightning_logs/
+docs/
+tests/
+*.pptx
+*.pdf
+*.log
+.env

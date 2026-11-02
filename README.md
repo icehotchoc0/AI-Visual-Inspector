@@ -135,12 +135,15 @@ curl -X POST http://localhost:8000/v1/inspections/upload \
 
 운영 가이드 [docs/OPERATIONS.md](docs/OPERATIONS.md) · 개인정보·법무 체크리스트 [docs/PRIVACY.md](docs/PRIVACY.md) · 모델 학습 전략 [docs/TRAINING_STRATEGY.md](docs/TRAINING_STRATEGY.md)
 
-### 배포
+### Docker로 실행
 
 ```bash
-cd docker && docker compose up --build                       # 파일럿: SQLite, API+대시보드
-cd docker && docker compose -f docker-compose.prod.yml up -d  # 상용: PostgreSQL + API + 워커 + 대시보드 + 사진 정리
+cp .env.example .env     # ANTHROPIC_API_KEY, INSPECTOR_API_KEYS, INSPECTOR_DASHBOARD_API_KEY 채우기
+docker compose -f docker/docker-compose.yml up -d --build        # 파일럿: SQLite, API(8000) + 대시보드(8501)
+docker compose -f docker/docker-compose.prod.yml up -d --build   # 상용: PostgreSQL + API + 워커 + 대시보드 + 사진 정리
 ```
+
+DB·보관 사진은 `backend/data/`(파일럿) 또는 named volume(상용)에 남습니다. 카테고리 파일은 읽기 전용으로 마운트되므로 바꾼 뒤 `docker compose restart backend`만 하면 됩니다. 호스트의 Ollama는 `host.docker.internal`로 연결됩니다.
 
 ### 주요 환경변수
 

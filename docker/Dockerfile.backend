@@ -1,11 +1,12 @@
-FROM python:3.11-slim
+ARG BASE_IMAGE=python:3.11-slim
+FROM ${BASE_IMAGE}
 
 WORKDIR /app
+ENV PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# opencv needs these system libs even in "headless" mode
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1 libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
+# No apt packages needed: current opencv-python-headless and pillow-heif wheels bundle their
+# native libraries (verified on python:3.11-slim). If an older opencv wheel ever fails with a
+# missing libGL/libgthread, add: apt-get install -y --no-install-recommends libgl1 libglib2.0-0
 
 COPY requirements.txt requirements-anomaly.txt ./
 RUN pip install --no-cache-dir -r requirements.txt "psycopg[binary]>=3.1"
@@ -18,6 +19,8 @@ COPY backend/ backend/
 COPY config/ config/
 COPY training/ training/
 COPY scripts/ scripts/
+RUN mkdir -p /app/backend/data /data/photos
 
 EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status==200 else 1)"
 CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000"]

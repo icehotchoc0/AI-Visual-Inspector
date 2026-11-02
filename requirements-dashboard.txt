@@ -1,0 +1,4 @@
+# Operator dashboard container (frontend/dashboard.py) - no backend deps needed
+streamlit>=1.38.0
+requests>=2.31.0
+pillow>=10.0.0

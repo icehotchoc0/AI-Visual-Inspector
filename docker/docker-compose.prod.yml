@@ -36,7 +36,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "8000:8000"
+      - "8000:8000"   # api 를 scale 하려면 이 줄을 지우고 앞단 프록시로 분배
     depends_on:
       db:
         condition: service_healthy

@@ -1,9 +1,11 @@
-# 마이스터즈 AI 사진 검수 (AI-Visual-Inspector) - field-service photo verification microservice.
+# 마이스터즈 AI 사진 검수 - 파일럿/시연용 구성 (서버 1대, SQLite).
 #
-# VLM: Claude API (primary, needs ANTHROPIC_API_KEY in ../.env) with an
-# optional local Ollama fallback running on the HOST (reached through
-# host.docker.internal). The anomaly-detection plugin is optional and needs
-# the GPU image (see Dockerfile.backend ANOMALY build arg).
+#   cp .env.example .env            # ANTHROPIC_API_KEY, INSPECTOR_API_KEYS, INSPECTOR_DASHBOARD_API_KEY 채우기
+#   docker compose -f docker/docker-compose.yml up -d --build
+#   → API http://localhost:8000/docs · 대시보드 http://localhost:8501
+#
+# Ollama 폴백은 호스트에서 실행 중인 Ollama 를 host.docker.internal 로 연결합니다.
+# 복수 인스턴스·PostgreSQL 은 docker-compose.prod.yml.
 services:
   backend:
     build:
@@ -11,21 +13,19 @@ services:
       dockerfile: docker/Dockerfile.backend
     ports:
       - "8000:8000"
+    env_file:
+      - ../.env
     environment:
-      - INSPECTOR_OLLAMA_HOST=http://host.docker.internal:11434
-      - INSPECTOR_DB_PATH=/app/backend/data/inspector.db
+      INSPECTOR_OLLAMA_HOST: http://host.docker.internal:11434
+      INSPECTOR_DB_PATH: /app/backend/data/inspector.db
+      INSPECTOR_CATEGORIES_PATH: /app/config/categories
+      INSPECTOR_PHOTO_STORE_DIR: ${INSPECTOR_PHOTO_STORE_DIR:-/app/backend/data/photos}
+      INSPECTOR_LOG_JSON: "true"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ../backend/data:/app/backend/data
-      - ../config:/app/config:ro
-    env_file:
-      - ../.env
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status==200 else 1)"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
+      - ../backend/data:/app/backend/data       # SQLite DB, 보관 사진, 체크포인트 (호스트에 유지)
+      - ../config:/app/config:ro                # 카테고리 파일을 바꾸면 컨테이너 재시작만
     restart: unless-stopped
 
   dashboard:
@@ -35,9 +35,9 @@ services:
     ports:
       - "8501:8501"
     environment:
-      - INSPECTOR_API_URL=http://backend:8000
-    env_file:
-      - ../.env
+      INSPECTOR_API_URL: http://backend:8000
+      # INSPECTOR_API_KEYS 중 하나. 비워 두면 백엔드 인증이 꺼진 경우에만 동작
+      INSPECTOR_API_KEY: ${INSPECTOR_DASHBOARD_API_KEY:-}
     depends_on:
       - backend
     restart: unless-stopped

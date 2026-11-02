@@ -53,12 +53,19 @@ GPU·네트워크·API 키 없이 돌아갑니다(VLM 은 FakeVLM, Claude SDK �
 ## 4. Docker
 
 ```bash
-cd docker
-docker compose up --build            # backend :8000, dashboard :8501
-docker compose build --build-arg ANOMALY=1 backend   # 이상 탐지 플러그인 포함 이미지
+cp .env.example .env                                   # 키 3개: ANTHROPIC_API_KEY, INSPECTOR_API_KEYS, INSPECTOR_DASHBOARD_API_KEY
+docker compose -f docker/docker-compose.yml up -d --build
 ```
 
-`../.env` 를 그대로 읽습니다. 호스트의 Ollama 는 `host.docker.internal` 로 연결됩니다.
+- API http://localhost:8000/docs · 대시보드 http://localhost:8501 · 상태 http://localhost:8000/health
+- 로그: `docker compose -f docker/docker-compose.yml logs -f backend`
+- 중지: `docker compose -f docker/docker-compose.yml down` (DB·사진은 `backend/data/`에 유지)
+- 카테고리 파일 수정 후: `docker compose -f docker/docker-compose.yml restart backend`
+- 이상 탐지 플러그인 포함 이미지: `docker compose -f docker/docker-compose.yml build --build-arg ANOMALY=1 backend`
+- 상용(PostgreSQL·워커 분리·스케일): `docker/docker-compose.prod.yml`, `docs/OPERATIONS.md` §1
+- 사내 미러를 쓰면 `--build-arg BASE_IMAGE=<registry>/python:3.11-slim` 으로 베이스 이미지를 바꿀 수 있습니다.
+
+호스트의 Ollama는 컨테이너에서 `host.docker.internal:11434`로 연결됩니다(compose에 설정됨). Linux에서 Ollama가 127.0.0.1에만 바인딩돼 있으면 `OLLAMA_HOST=0.0.0.0`로 띄워야 합니다.
 
 ## 5. 카테고리 추가/수정
 
