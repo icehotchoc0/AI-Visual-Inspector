@@ -1,20 +1,21 @@
 # 마이스터즈 AI 사진 검수 - 파일럿/시연용 구성 (서버 1대, SQLite).
 #
 #   cp .env.example .env            # ANTHROPIC_API_KEY, INSPECTOR_API_KEYS, INSPECTOR_DASHBOARD_API_KEY 채우기
-#   docker compose -f docker/docker-compose.yml up -d --build
-#   → API http://localhost:8000/docs · 대시보드 http://localhost:8501
+#   docker compose up -d --build    # 저장소 루트에서. .env 의 포트·키 변수가 그대로 적용됨
+#   → API http://localhost:8000/docs · 대시보드 http://localhost:8501 (포트는 .env 에서 변경)
 #
 # Ollama 폴백은 호스트에서 실행 중인 Ollama 를 host.docker.internal 로 연결합니다.
-# 복수 인스턴스·PostgreSQL 은 docker-compose.prod.yml.
+# 복수 인스턴스·PostgreSQL 은 compose.prod.yaml (docker compose -f compose.prod.yaml up -d).
+name: inspector
 services:
   backend:
     build:
-      context: ..
+      context: .
       dockerfile: docker/Dockerfile.backend
     ports:
       - "${INSPECTOR_API_PORT:-8000}:8000"       # 호스트 포트가 사용 중이면 .env 에서 INSPECTOR_API_PORT 변경
     env_file:
-      - ../.env
+      - .env
     environment:
       INSPECTOR_OLLAMA_HOST: http://host.docker.internal:11434
       INSPECTOR_DB_PATH: /app/backend/data/inspector.db
@@ -24,13 +25,13 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ../backend/data:/app/backend/data       # SQLite DB, 보관 사진, 체크포인트 (호스트에 유지)
-      - ../config:/app/config:ro                # 카테고리 파일을 바꾸면 컨테이너 재시작만
+      - ./backend/data:/app/backend/data       # SQLite DB, 보관 사진, 체크포인트 (호스트에 유지)
+      - ./config:/app/config:ro                # 카테고리 파일을 바꾸면 컨테이너 재시작만
     restart: unless-stopped
 
   dashboard:
     build:
-      context: ..
+      context: .
       dockerfile: docker/Dockerfile.dashboard
     ports:
       - "${INSPECTOR_DASHBOARD_PORT:-8501}:8501"  # 호스트 포트가 사용 중이면 .env 에서 INSPECTOR_DASHBOARD_PORT 변경

@@ -139,11 +139,11 @@ curl -X POST http://localhost:8000/v1/inspections/upload \
 
 ```bash
 cp .env.example .env     # ANTHROPIC_API_KEY, INSPECTOR_API_KEYS, INSPECTOR_DASHBOARD_API_KEY 채우기
-docker compose -f docker/docker-compose.yml up -d --build        # 파일럿: SQLite, API(8000) + 대시보드(8501)
-docker compose -f docker/docker-compose.prod.yml up -d --build   # 상용: PostgreSQL + API + 워커 + 대시보드 + 사진 정리
+docker compose up -d --build                        # 파일럿: SQLite, API(8000) + 대시보드(8501). 포트는 .env 의 INSPECTOR_*_PORT
+docker compose -f compose.prod.yaml up -d --build   # 상용: PostgreSQL + API + 워커 + 대시보드 + 사진 정리
 ```
 
-DB·보관 사진은 `backend/data/`(파일럿) 또는 named volume(상용)에 남습니다. 카테고리 파일은 읽기 전용으로 마운트되므로 바꾼 뒤 `docker compose restart backend`만 하면 됩니다. 호스트의 Ollama는 `host.docker.internal`로 연결됩니다.
+DB·보관 사진은 `backend/data/`(파일럿) 또는 named volume(상용)에 남습니다. 카테고리 파일은 읽기 전용으로 마운트되므로 바꾼 뒤 `docker compose restart backend`만 하면 됩니다. 명령은 항상 저장소 루트에서 실행합니다(루트의 `.env`를 읽습니다). 호스트의 Ollama는 `host.docker.internal`로 연결됩니다.
 
 ### 주요 환경변수
 
@@ -189,7 +189,8 @@ training/
 scripts/              purge_photos.py (보존 정리), loadtest.py (부하 테스트)
 tests/                99 tests: 규칙·판정·라우터·파이프라인·API·큐·검수·저장소 (FakeVLM, SQLite 또는 PostgreSQL)
 docs/                 API.md · ARCHITECTURE.md · DATA_SPEC.md · OPERATIONS.md · PRIVACY.md · TRAINING_STRATEGY.md
-docker/               Dockerfile.backend · Dockerfile.dashboard · docker-compose.yml · docker-compose.prod.yml
+compose.yaml · compose.prod.yaml   파일럿 / 상용 구성 (저장소 루트에서 docker compose ...)
+docker/               Dockerfile.backend · Dockerfile.dashboard
 .github/workflows/    ci.yml: 설정 검증, 테스트(SQLite·PostgreSQL), 기동 확인
 ```
 
