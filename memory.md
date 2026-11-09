@@ -34,12 +34,11 @@
 
 ## 4. 현재 상태 (2026-11-09)
 - 사용자 로컬 Docker에서 전체 흐름 동작 확인(Claude 연결, 자동 컷 분류 포함). 실사진 기준값 보정은 아직.
-- 진행 중: 시연용 UI/UX 개선 — frontend/dashboard.py 전면 재작성(브랜드 색, 단계형 흐름, 판정 히어로·KPI·칩·사진 카드, 검수 큐·이력·통계 탭), 로고 삽입 완료.
-  스크린샷 검증 중(스크래치 ui2/). 확인된 것: 홈·업로드 화면 양호. 미확인: 결과 영역 하단, 검수 큐 화면.
-- 커밋 전 상태: dashboard.py, .streamlit/config.toml, frontend/assets/* 변경분 미커밋.
+- 시연용 UI/UX 개선 완료·푸시: frontend/dashboard.py 전면 재작성(브랜드 색, 로고, 단계형 흐름, 판정 히어로·KPI·칩·사진 카드, 검수 큐·이력·통계 탭).
+  스크린샷으로 홈·업로드·결과·검수 큐 화면 확인함. 사용자 반응 대기.
 
 ## 5. 다음 할 일
-1. UI 스크린샷(결과·검수 큐) 확인 후 미세 조정 → 커밋·푸시 → 사용자에게 `git pull && docker compose up -d --build` 안내.
+1. 사용자 UI 피드백 반영(있으면). 재빌드 안내는 `git pull && docker compose up -d --build`.
 2. 사용자 쪽: 실사진으로 선명도 보정, 검수 큐에 판정 쌓기(50건) → export_eval_set → evaluate_eval_set 로 정확도 측정.
 3. 법무 검토(docs/PRIVACY.md), VC 덱 숫자 입력(3·15번 슬라이드)은 사용자 몫.
 

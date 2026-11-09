@@ -112,9 +112,9 @@ def decide(
 
     # ---- 7. VLM availability -------------------------------------------------
     if vlm_requested and not vlm_available:
-        review.append("VLM 공급자(Claude/Ollama)에 모두 연결할 수 없어 시각적 하자 검사가 수행되지 않았습니다. 수동 검토가 필요합니다.")
+        review.append("AI 분석(Claude/Ollama)에 연결할 수 없어 시공 하자 검사가 수행되지 않았습니다. 수동 검토가 필요합니다.")
     elif not vlm_requested:
-        notes.append("요청에 따라 VLM 하자 검사를 생략했습니다.")
+        notes.append("요청에 따라 AI 하자 분석을 생략했습니다.")
 
     # ---- Resolve -------------------------------------------------------------
     if fail:

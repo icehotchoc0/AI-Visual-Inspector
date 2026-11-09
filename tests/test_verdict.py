@@ -53,7 +53,7 @@ def test_missing_required_shot_policy(registry):
 def test_vlm_unavailable_forces_review(registry):
     cat = registry.get("plumbing")
     d = decide(cat, [_photo()], [], vlm_requested=True, vlm_available=False)
-    assert d.verdict == "REVIEW" and any("VLM" in r for r in d.reasons)
+    assert d.verdict == "REVIEW" and any("AI 분석" in r for r in d.reasons)
 
 
 def test_vlm_skipped_by_request_can_pass(registry):

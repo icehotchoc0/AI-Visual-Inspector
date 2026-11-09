@@ -1,9 +1,9 @@
-# 마이스터즈 디자인 토큰 (meisters-homecare/DESIGN.md) - 운영자 대시보드 테마
+# 마이스터즈 브랜드 토큰 (로고: 검정 #191A1A · 레드 #C4191F · 옐로 #F3CB0E)
 [theme]
-primaryColor = "#1C2B4A"
+primaryColor = "#C4191F"
 backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F4F6F9"
-textColor = "#0F1A33"
+secondaryBackgroundColor = "#F4F5F7"
+textColor = "#191A1A"
 font = "sans serif"
 
 [browser]
@@ -12,3 +12,6 @@ gatherUsageStats = false
 [client]
 # 시연 화면에서 Streamlit 기본 메뉴(Deploy 등)를 숨김
 toolbarMode = "minimal"
+
+[server]
+maxUploadSize = 50
